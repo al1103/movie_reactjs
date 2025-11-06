@@ -75,12 +75,12 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
 
   return (
     <>
-      <div className="panel" style={{ marginTop: '1.5rem' }}>
+      <div className="panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2>{movie.title}</h2>
           <button
             onClick={onClose}
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8' }}
+            style={{ background: 'transparent', border: 'none', color: '#64748b' }}
           >
             Đóng
           </button>
@@ -89,7 +89,7 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
           style={{
             display: 'grid',
             gap: '1.5rem',
-            gridTemplateColumns: 'minmax(280px, 1fr) 2fr',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           }}
         >
           <img
@@ -98,7 +98,7 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
             style={{ width: '100%', borderRadius: '16px', objectFit: 'cover' }}
           />
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <p style={{ fontSize: '1rem', lineHeight: 1.6 }}>{movie.description}</p>
+            <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#374151' }}>{movie.description}</p>
             <div className="tag-list">
               <span className="tag">{movie.year}</span>
               <span className="tag">{movie.country}</span>
@@ -177,7 +177,7 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
               </div>
             </form>
           ) : (
-            <p style={{ color: '#94a3b8' }}>Đăng nhập để đánh giá hoặc bình luận.</p>
+            <p style={{ color: '#64748b' }}>Đăng nhập để đánh giá hoặc bình luận.</p>
           )}
           {error && <p className="error">{error}</p>}
           {message && <p className="success">{message}</p>}
@@ -186,12 +186,12 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
               <div className="comment-item" key={item.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <strong>{item.userName}</strong>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                     {formatDate(item.createdAt)}
                   </span>
                 </div>
                 {item.hidden ? (
-                  <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>
+                  <p style={{ color: '#64748b', fontStyle: 'italic' }}>
                     Bình luận đã bị ẩn bởi quản trị viên.
                   </p>
                 ) : (

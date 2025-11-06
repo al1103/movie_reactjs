@@ -18,7 +18,7 @@ export const FavoritesHistory = ({ movies, favorites, history }) => {
   }, [history, movies]);
 
   return (
-    <div className="panel" style={{ marginTop: '1.5rem' }}>
+    <div className="panel">
       <h3>Tủ phim của bạn</h3>
       <div style={{ display: 'grid', gap: '1rem' }}>
         <section>
@@ -32,7 +32,7 @@ export const FavoritesHistory = ({ movies, favorites, history }) => {
               ))}
             </ul>
           ) : (
-            <p style={{ color: '#94a3b8' }}>Chưa có phim yêu thích.</p>
+            <p style={{ color: '#64748b' }}>Chưa có phim yêu thích.</p>
           )}
         </section>
         <section>
@@ -47,7 +47,7 @@ export const FavoritesHistory = ({ movies, favorites, history }) => {
               ))}
             </ul>
           ) : (
-            <p style={{ color: '#94a3b8' }}>Bạn chưa xem phim nào.</p>
+            <p style={{ color: '#64748b' }}>Bạn chưa xem phim nào.</p>
           )}
         </section>
       </div>

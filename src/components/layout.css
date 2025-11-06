@@ -1,0 +1,148 @@
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: #0f172a;
+}
+
+.app-background {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 10% 20%, #f0f9ff, #e0e7ff 35%, #f5d0fe 70%);
+  z-index: -2;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2.5rem;
+  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.1rem;
+  color: #1f2937;
+}
+
+.app-brand small {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-nav-link {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.2s ease;
+}
+
+.app-nav-link:hover {
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.app-nav-link--active {
+  background: linear-gradient(135deg, #6366f1, #ec4899);
+  color: white !important;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.25);
+}
+
+.app-main {
+  flex: 1;
+  padding: 2.5rem;
+}
+
+.app-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.app-stats .stats-grid {
+  grid-template-columns: 1fr;
+}
+
+.app-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.app-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2.5rem;
+  font-size: 0.85rem;
+  color: #475569;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 1024px) {
+  .app-main {
+    padding: 1.5rem;
+  }
+
+  .app-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    order: 2;
+  }
+
+  .app-content {
+    order: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .app-main {
+    padding: 1rem;
+  }
+
+  .app-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  .app-nav {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
