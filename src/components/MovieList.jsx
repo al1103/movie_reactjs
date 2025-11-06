@@ -4,6 +4,7 @@ import './panel.css';
 const SKELETON_ITEMS = Array.from({ length: 6 });
 
 export const MovieList = ({
+  id,
   movies,
   genres,
   actors,
@@ -17,7 +18,7 @@ export const MovieList = ({
 
   if (loading) {
     return (
-      <div className="panel" style={{ marginTop: '1.5rem' }}>
+      <div className="panel" id={id}>
         <h3>Kết quả</h3>
         <div className="movie-grid">
           {SKELETON_ITEMS.map((_, index) => (
@@ -40,7 +41,7 @@ export const MovieList = ({
 
   if (error) {
     return (
-      <div className="panel" style={{ marginTop: '1.5rem' }}>
+      <div className="panel" id={id}>
         <h3>Kết quả</h3>
         <p className="error">{error}</p>
       </div>
@@ -49,7 +50,7 @@ export const MovieList = ({
 
   if (!movies.length) {
     return (
-      <div className="panel" style={{ marginTop: '1.5rem' }}>
+      <div className="panel" id={id}>
         <h3>Kết quả</h3>
         <p>Không tìm thấy phim phù hợp.</p>
       </div>
@@ -57,7 +58,7 @@ export const MovieList = ({
   }
 
   return (
-    <div className="panel" style={{ marginTop: '1.5rem' }}>
+    <div className="panel" id={id}>
       <h3>Kết quả ({movies.length})</h3>
       <div className="movie-grid">
         {movies.map((movie) => (
@@ -74,7 +75,7 @@ export const MovieList = ({
                   </span>
                 ))}
               </div>
-              <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{movie.description}</p>
+              <p style={{ color: '#64748b', fontSize: '0.9rem' }}>{movie.description}</p>
               <p style={{ fontSize: '0.85rem' }}>
                 Đạo diễn: <strong>{movie.director}</strong>
               </p>

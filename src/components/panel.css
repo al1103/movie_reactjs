@@ -1,69 +1,89 @@
 .panel {
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 16px;
-  padding: 1.5rem;
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.4);
+  border-radius: 20px;
+  padding: 1.75rem;
+  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(16px);
 }
 
-.panel h3 {
+.panel h3,
+.panel h4 {
   margin-top: 0;
+  color: #111827;
 }
 
 .panel-tabs {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .panel-tabs button {
   flex: 1;
-  padding: 0.5rem 1rem;
-  background: rgba(148, 163, 184, 0.1);
+  padding: 0.6rem 1rem;
+  background: rgba(148, 163, 184, 0.15);
   border: 1px solid transparent;
   border-radius: 999px;
-  color: #e2e8f0;
+  color: #1f2937;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.panel-tabs button:hover {
+  background: rgba(99, 102, 241, 0.12);
 }
 
 .panel-tabs button.active {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #6366f1, #ec4899);
   border-color: transparent;
-  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 12px 25px rgba(236, 72, 153, 0.25);
 }
 
 .panel-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.9rem;
 }
 
 .panel-form label {
   display: flex;
   flex-direction: column;
-  font-size: 0.9rem;
-  gap: 0.25rem;
+  font-size: 0.92rem;
+  gap: 0.35rem;
+  color: #1f2937;
 }
 
-.panel-form input,
-.panel-form select,
-.panel-form textarea {
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  padding: 0.6rem 0.75rem;
-  background: rgba(15, 23, 42, 0.7);
-  color: #e2e8f0;
+.panel input,
+.panel select,
+.panel textarea {
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0.65rem 0.85rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.panel input:focus,
+.panel select:focus,
+.panel textarea:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.25);
 }
 
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
+  gap: 0.9rem;
 }
 
 .primary {
-  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  background: linear-gradient(135deg, #6366f1, #ec4899);
   border: none;
-  padding: 0.65rem 1.2rem;
+  padding: 0.7rem 1.4rem;
   border-radius: 999px;
   font-weight: 600;
   color: white;
@@ -72,32 +92,39 @@
 
 .primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgba(236, 72, 153, 0.3);
+  box-shadow: 0 16px 24px rgba(99, 102, 241, 0.25);
 }
 
 .error {
-  color: #fca5a5;
+  color: #dc2626;
   margin: 0;
 }
 
 .success {
-  color: #86efac;
+  color: #16a34a;
   margin: 0;
 }
 
 .movie-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
 }
 
 .movie-card {
-  background: rgba(15, 23, 42, 0.85);
-  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 20px;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   display: flex;
   flex-direction: column;
+  box-shadow: 0 18px 35px rgba(148, 163, 184, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.movie-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 25px 45px rgba(99, 102, 241, 0.18);
 }
 
 .movie-card img {
@@ -107,50 +134,55 @@
 }
 
 .movie-card-content {
-  padding: 1rem;
+  padding: 1.1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .tag-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .tag {
-  background: rgba(148, 163, 184, 0.1);
+  background: rgba(226, 232, 240, 0.9);
   border-radius: 999px;
-  padding: 0.25rem 0.6rem;
+  padding: 0.3rem 0.7rem;
   font-size: 0.75rem;
+  color: #1f2937;
+  font-weight: 500;
 }
 
 .actions-row {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.9rem;
 }
 
 .comment-item {
-  background: rgba(15, 23, 42, 0.6);
-  border-radius: 12px;
-  padding: 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(248, 250, 252, 0.9);
+  border-radius: 14px;
+  padding: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
 .badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  background: rgba(34, 197, 94, 0.2);
-  color: #bbf7d0;
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.18);
+  color: #15803d;
   font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .stats-grid {
@@ -161,23 +193,27 @@
 }
 
 .stat-card {
-  background: rgba(15, 23, 42, 0.8);
-  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
   padding: 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.25);
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .stat-label {
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .stat-value {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 700;
+  color: #111827;
 }
 
 .skeleton {
@@ -192,23 +228,23 @@
   transform: translateX(-100%);
   background: linear-gradient(
     90deg,
-    rgba(148, 163, 184, 0.05),
-    rgba(148, 163, 184, 0.15),
-    rgba(148, 163, 184, 0.05)
+    rgba(226, 232, 240, 0.1),
+    rgba(148, 163, 184, 0.25),
+    rgba(226, 232, 240, 0.1)
   );
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.4s infinite;
 }
 
 .skeleton-image {
   width: 100%;
   height: 320px;
-  background: rgba(148, 163, 184, 0.1);
+  background: rgba(226, 232, 240, 0.6);
 }
 
 .skeleton-line {
   height: 12px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(203, 213, 225, 0.6);
 }
 
 .skeleton-line--lg {

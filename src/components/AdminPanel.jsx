@@ -184,7 +184,7 @@ export const AdminPanel = () => {
 
   if (!isAdmin) {
     return (
-      <div className="panel" style={{ marginTop: '1.5rem' }}>
+      <div className="panel">
         <h3>Khu vực quản trị</h3>
         <p>Vui lòng đăng nhập bằng tài khoản quản trị để tiếp tục.</p>
       </div>
@@ -192,9 +192,9 @@ export const AdminPanel = () => {
   }
 
   return (
-    <div className="panel" style={{ marginTop: '1.5rem' }}>
+    <div className="panel">
       <h2>Quản trị hệ thống</h2>
-      <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+      <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
         Quản lý phim, thể loại, diễn viên, bình luận và người dùng. Dán URL Cloudinary vào các trường Poster/Banner.
       </p>
       {message && <p className="success">{message}</p>}
@@ -415,7 +415,7 @@ export const AdminPanel = () => {
             >
               <div>
                 <strong>{user.name}</strong> ({user.email})
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Vai trò: {user.role}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Vai trò: {user.role}</div>
               </div>
               <div className="actions-row">
                 <select
@@ -450,12 +450,12 @@ export const AdminPanel = () => {
                 <div>
                   <strong>{item.userName}</strong> - <span>{item.movie.title}</span>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                   {new Date(item.createdAt).toLocaleString('vi-VN')}
                 </span>
               </div>
               {item.hidden ? (
-                <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Đang bị ẩn</p>
+                <p style={{ color: '#64748b', fontStyle: 'italic' }}>Đang bị ẩn</p>
               ) : (
                 <p>{item.text}</p>
               )}
