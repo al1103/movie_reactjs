@@ -1,4 +1,4 @@
-import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import './panel.css';
 
 const SKELETON_ITEMS = Array.from({ length: 6 });
@@ -13,6 +13,7 @@ export const MovieList = ({
   loading,
   error,
 }) => {
+  const navigate = useNavigate();
   const genreMap = Object.fromEntries(genres.map((genre) => [genre.id, genre.name]));
   const actorMap = Object.fromEntries(actors.map((actor) => [actor.id, actor.name]));
 
@@ -84,7 +85,10 @@ export const MovieList = ({
                 <strong>{movie.cast.map((id) => actorMap[id]).join(', ')}</strong>
               </p>
               <div className="actions-row">
-                <button className="primary" onClick={() => onSelect(movie)}>
+                <button
+                  className="primary"
+                  onClick={() => navigate(`/movie/${movie.id}`)}
+                >
                   Xem chi tiết
                 </button>
                 {favorites.includes(movie.id) && <span className="badge">Yêu thích</span>}

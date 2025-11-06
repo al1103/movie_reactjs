@@ -88,4 +88,13 @@ export const initialUsers = [
     favorites: [],
     history: [],
   },
+  {
+    id: 'user1',
+    email: 'user@movie.local',
+    password: 'user123',
+    role: 'user',
+    name: 'Nguyễn Văn An',
+    favorites: ['m1', 'm2'],
+    history: ['m1', 'm2', 'm3'],
+  },
 ];

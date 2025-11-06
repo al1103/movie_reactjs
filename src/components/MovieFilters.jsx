@@ -1,4 +1,3 @@
-import React from 'react';
 import './panel.css';
 
 export const MovieFilters = ({
@@ -7,9 +6,30 @@ export const MovieFilters = ({
   onChange,
   onClear,
 }) => {
+  const handleGenreClick = (genreId) => {
+    onChange({ ...filters, genre: filters.genre === genreId ? '' : genreId });
+  };
+
   return (
     <div className="panel">
       <h3>Bộ lọc phim</h3>
+
+      {/* Genre Badges */}
+      {genres.length > 0 && (
+        <div className="genre-badges">
+          {genres.map((genre) => (
+            <button
+              key={genre.id}
+              className={`genre-badge ${filters.genre === genre.id ? 'active' : ''}`}
+              onClick={() => handleGenreClick(genre.id)}
+              title={`Lọc theo thể loại: ${genre.name}`}
+            >
+              {genre.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="filters-grid">
         <label>
           Thể loại

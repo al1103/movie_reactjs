@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   initialActors,
   initialGenres,
@@ -103,10 +103,22 @@ export const AppDataProvider = ({ children }) => {
       state.users.find((user) => user.email.toLowerCase() === email.toLowerCase());
 
     const login = (email, password) => {
+      console.log('🔍 Đang đăng nhập với email:', email);
+      console.log('📋 Danh sách users hiện tại:', state.users.map(u => ({ email: u.email, id: u.id })));
+
       const user = findUserByEmail(email);
-      if (!user || user.password !== password) {
-        throw new Error('Sai email hoặc mật khẩu');
+      console.log('👤 User tìm thấy:', user ? { email: user.email, id: user.id } : 'Không tìm thấy');
+
+      if (!user) {
+        throw new Error('Không tìm thấy tài khoản với email này');
       }
+
+      if (user.password !== password) {
+        console.log('❌ Sai mật khẩu! Mật khẩu đúng:', user.password, '| Mật khẩu nhập:', password);
+        throw new Error('Sai mật khẩu');
+      }
+
+      console.log('✅ Đăng nhập thành công!');
       withPersist(
         (prev) => ({
           ...prev,

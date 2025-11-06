@@ -1,13 +1,9 @@
-import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext.jsx';
-import { FavoritesHistory } from '../components/FavoritesHistory.jsx';
 import './pages.css';
 
 export const FavoritesPage = () => {
-  const {
-    currentUser,
-    state: { movies },
-  } = useAppData();
+  const { currentUser } = useAppData();
 
   if (!currentUser) {
     return (
@@ -27,20 +23,6 @@ export const FavoritesPage = () => {
     );
   }
 
-  return (
-    <div className="page-stack">
-      <section className="hero-panel hero-panel--compact">
-        <h1>Tủ phim cá nhân</h1>
-        <p>
-          Theo dõi những bộ phim bạn yêu thích và lịch sử xem gần đây. Đừng quên để lại đánh giá cho
-          cộng đồng nhé!
-        </p>
-      </section>
-      <FavoritesHistory
-        movies={movies}
-        favorites={currentUser.favorites || []}
-        history={currentUser.history || []}
-      />
-    </div>
-  );
+  // Redirect to new favorites page
+  return <Navigate to="/my-favorites" replace />;
 };

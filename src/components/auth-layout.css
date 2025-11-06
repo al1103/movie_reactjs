@@ -1,0 +1,145 @@
+/* Netflix Auth Layout */
+.auth-shell-netflix {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.auth-background-netflix {
+  position: fixed;
+  inset: 0;
+  background-image: url('https://assets.nflxext.com/ffe/siteui/vlv3/fc164b4b-f085-44ee-bb7f-ec7df8539eff/d23a1608-7d90-4da1-93d6-bae2fe60a69b/US-en-20230814-popsignuptwoweeks-perspective_alpha_website_large.jpg');
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+.auth-overlay-netflix {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+  z-index: 1;
+}
+
+.auth-container-netflix {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Header */
+.auth-header-netflix {
+  padding: 20px 50px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.netflix-logo-auth {
+  font-size: 36px;
+  font-weight: 900;
+  color: #e50914;
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  letter-spacing: 2px;
+  cursor: pointer;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Content */
+.auth-content-netflix {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.auth-box-netflix {
+  width: 100%;
+  max-width: 450px;
+  margin: 0 auto;
+}
+
+/* Footer */
+.auth-footer-netflix {
+  padding: 40px 50px 30px;
+  background: rgba(0, 0, 0, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-footer-netflix p {
+  color: #737373;
+  font-size: 16px;
+  margin: 0 0 20px 0;
+}
+
+.auth-footer-netflix .copyright {
+  margin-top: 20px;
+  font-size: 13px;
+}
+
+.footer-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.footer-links a {
+  color: #737373;
+  text-decoration: none;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.footer-links a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .auth-header-netflix {
+    padding: 15px 20px;
+  }
+
+  .netflix-logo-auth {
+    font-size: 28px;
+  }
+
+  .auth-content-netflix {
+    padding: 20px 15px;
+  }
+
+  .auth-box-netflix {
+    max-width: 100%;
+  }
+
+  .auth-footer-netflix {
+    padding: 30px 20px 20px;
+  }
+
+  .footer-links {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .netflix-logo-auth {
+    font-size: 24px;
+  }
+
+  .footer-links {
+    grid-template-columns: 1fr;
+  }
+}
