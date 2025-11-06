@@ -1,9 +1,51 @@
 import React from 'react';
 import './panel.css';
 
-export const MovieList = ({ movies, genres, actors, onSelect, favorites }) => {
+const SKELETON_ITEMS = Array.from({ length: 6 });
+
+export const MovieList = ({
+  movies,
+  genres,
+  actors,
+  onSelect,
+  favorites,
+  loading,
+  error,
+}) => {
   const genreMap = Object.fromEntries(genres.map((genre) => [genre.id, genre.name]));
   const actorMap = Object.fromEntries(actors.map((actor) => [actor.id, actor.name]));
+
+  if (loading) {
+    return (
+      <div className="panel" style={{ marginTop: '1.5rem' }}>
+        <h3>Kết quả</h3>
+        <div className="movie-grid">
+          {SKELETON_ITEMS.map((_, index) => (
+            <div className="movie-card skeleton" key={index}>
+              <div className="skeleton-image" />
+              <div className="movie-card-content">
+                <div className="skeleton-line skeleton-line--lg" />
+                <div className="skeleton-line" />
+                <div className="skeleton-line" />
+                <div className="skeleton-line skeleton-line--sm" />
+                <div className="skeleton-line skeleton-line--sm" />
+                <div className="skeleton-line skeleton-line--xs" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="panel" style={{ marginTop: '1.5rem' }}>
+        <h3>Kết quả</h3>
+        <p className="error">{error}</p>
+      </div>
+    );
+  }
 
   if (!movies.length) {
     return (

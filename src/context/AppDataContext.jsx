@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   initialActors,
   initialGenres,
@@ -21,6 +21,28 @@ const defaultState = {
 
 const AppDataContext = createContext(null);
 
+const DATA_URL = '/data/app-data.json';
+
+const normalizeMovie = (movie) => {
+  const ratings = movie.ratings || [];
+  const ratingValue =
+    ratings.length > 0
+      ?
+          Math.round(
+            (ratings.reduce((total, item) => total + item.score, 0) / ratings.length) * 10
+          ) / 10
+      : typeof movie.rating === 'number'
+      ? movie.rating
+      : 0;
+  return {
+    ...movie,
+    ratings,
+    comments: movie.comments || [],
+    rating: ratingValue,
+    views: movie.views || 0,
+  };
+};
+
 const withPersist = (updater, setState) => {
   setState((prev) => {
     const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -31,6 +53,50 @@ const withPersist = (updater, setState) => {
 
 export const AppDataProvider = ({ children }) => {
   const [state, setState] = useState(() => loadState(STORAGE_KEY, defaultState));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(DATA_URL);
+        if (!response.ok) {
+          throw new Error('Không thể tải dữ liệu phim');
+        }
+        const payload = await response.json();
+        if (!isSubscribed) return;
+
+        setState((prev) => {
+          const next = {
+            ...prev,
+            movies: (payload.movies || []).map(normalizeMovie),
+            genres: payload.genres || prev.genres,
+            actors: payload.actors || prev.actors,
+          };
+          saveState(STORAGE_KEY, next);
+          return next;
+        });
+        setError(null);
+      } catch (err) {
+        if (!isSubscribed) return;
+        console.error(err);
+        setError(err.message || 'Đã xảy ra lỗi khi tải dữ liệu');
+      } finally {
+        if (isSubscribed) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
 
   const value = useMemo(() => {
     const findUserByEmail = (email) =>
@@ -267,25 +333,6 @@ export const AppDataProvider = ({ children }) => {
       );
     };
 
-    const normalizeMovie = (movie) => {
-      const ratings = movie.ratings || [];
-      const ratingValue =
-        ratings.length > 0
-          ? Math.round(
-              (ratings.reduce((total, item) => total + item.score, 0) / ratings.length) * 10
-            ) / 10
-          : typeof movie.rating === 'number'
-          ? movie.rating
-          : 0;
-      return {
-        ...movie,
-        ratings,
-        comments: movie.comments || [],
-        rating: ratingValue,
-        views: movie.views || 0,
-      };
-    };
-
     const upsertMovie = (movie) => {
       withPersist(
         (prev) => {
@@ -426,6 +473,8 @@ export const AppDataProvider = ({ children }) => {
     return {
       state,
       currentUser,
+      loading,
+      error,
       login,
       logout,
       register,
@@ -437,7 +486,7 @@ export const AppDataProvider = ({ children }) => {
       adminActions,
       stats,
     };
-  }, [state, setState]);
+  }, [state, setState, loading, error]);
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 };

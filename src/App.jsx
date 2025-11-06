@@ -13,6 +13,8 @@ const Dashboard = () => {
   const {
     state: { movies, genres, actors },
     currentUser,
+    loading,
+    error,
   } = useAppData();
   const [filters, setFilters] = useState({ genre: '', year: '', country: '', maxDuration: '' });
   const [query, setQuery] = useState('');
@@ -86,6 +88,8 @@ const Dashboard = () => {
         actors={actors}
         onSelect={(movie) => setSelectedMovieId(movie.id)}
         favorites={currentUser?.favorites || []}
+        loading={loading}
+        error={error}
       />
 
       {selectedMovie && (
