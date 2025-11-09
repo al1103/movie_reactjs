@@ -14,8 +14,8 @@ export const MovieList = ({
   error,
 }) => {
   const navigate = useNavigate();
-  const genreMap = Object.fromEntries(genres.map((genre) => [genre.id, genre.name]));
-  const actorMap = Object.fromEntries(actors.map((actor) => [actor.id, actor.name]));
+  const genreMap = Object.fromEntries((genres || []).map((genre) => [genre.id, genre.name]));
+  const actorMap = Object.fromEntries((actors || []).map((actor) => [actor.id, actor.name]));
 
   if (loading) {
     return (
@@ -69,20 +69,26 @@ export const MovieList = ({
               <h4>{movie.title}</h4>
               <div className="tag-list">
                 <span className="tag">{movie.year}</span>
-                <span className="tag">{movie.country}</span>
-                {movie.genres.map((genreId) => (
-                  <span className="tag" key={genreId}>
-                    {genreMap[genreId] || 'Khác'}
+                {movie.country && (
+                  <>
+                    {Array.isArray(movie.country) ? movie.country.map(c => (
+                      <span className="tag" key={c.slug}>{c.name}</span>
+                    )) : <span className="tag">{movie.country}</span>}
+                  </>
+                )}
+                {movie.category && Array.isArray(movie.category) && movie.category.map((cat) => (
+                  <span className="tag" key={cat.slug}>
+                    {cat.name}
                   </span>
                 ))}
               </div>
               <p style={{ color: '#64748b', fontSize: '0.9rem' }}>{movie.description}</p>
               <p style={{ fontSize: '0.85rem' }}>
-                Đạo diễn: <strong>{movie.director}</strong>
+                Đạo diễn: <strong>{Array.isArray(movie.director) ? movie.director.join(', ') : movie.director || 'N/A'}</strong>
               </p>
               <p style={{ fontSize: '0.85rem' }}>
                 Diễn viên:{' '}
-                <strong>{movie.cast.map((id) => actorMap[id]).join(', ')}</strong>
+                <strong>{Array.isArray(movie.actor) ? movie.actor.join(', ') : movie.actor || 'N/A'}</strong>
               </p>
               <div className="actions-row">
                 <button

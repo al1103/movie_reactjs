@@ -1,19 +1,22 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  initialActors,
-  initialGenres,
-  initialMovies,
-  initialUsers,
-} from '../data/sampleData.js';
+  countryApi,
+  genreApi,
+  movieApi,
+  normalizeCountryFromAPI,
+  normalizeGenreFromAPI,
+  normalizeMovieFromAPI
+} from '../utils/movieApi.js';
 import { loadState, saveState } from '../utils/storage.js';
 
 const STORAGE_KEY = 'movie-portal-state-v1';
 
 const defaultState = {
-  movies: initialMovies,
-  genres: initialGenres,
-  actors: initialActors,
-  users: initialUsers,
+  movies: [],
+  genres: [],
+  countries: [],
+  actors: [],
+  users: [],
   currentUserId: null,
   commentThrottle: {},
   ratingThrottle: {},
@@ -21,7 +24,7 @@ const defaultState = {
 
 const AppDataContext = createContext(null);
 
-const DATA_URL = '/data/app-data.json';
+const API_ENABLED = import.meta.env.VITE_USE_API === 'true';
 
 const normalizeMovie = (movie) => {
   const ratings = movie.ratings || [];
@@ -62,27 +65,62 @@ export const AppDataProvider = ({ children }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(DATA_URL);
-        if (!response.ok) {
-          throw new Error('Không thể tải dữ liệu phim');
-        }
-        const payload = await response.json();
-        if (!isSubscribed) return;
 
+        if (API_ENABLED) {
+          // Fetch from API
+          const [moviesData, genresData, countriesData] = await Promise.all([
+            movieApi.getLatestMovies(1).catch(() => ({ items: [] })),
+            genreApi.getAllGenres().catch(() => []),
+            countryApi.getAllCountries().catch(() => []),
+          ]);
+
+          if (!isSubscribed) return;
+
+          setState((prev) => {
+            const movies = (moviesData.items || []).map(normalizeMovieFromAPI);
+            // Handle both array and object response formats
+            const genresArray = Array.isArray(genresData) ? genresData : (genresData?.items || []);
+            const countriesArray = Array.isArray(countriesData) ? countriesData : (countriesData?.items || []);
+
+            const genres = genresArray.map(normalizeGenreFromAPI);
+            const countries = countriesArray.map(normalizeCountryFromAPI);
+
+            const next = {
+              ...prev,
+              movies,
+              genres,
+              countries,
+            };
+            saveState(STORAGE_KEY, next);
+            return next;
+          });
+        } else {
+          // Use sample data - fallback
+          setState((prev) => {
+            const next = {
+              ...prev,
+              movies: [],
+              genres: [],
+            };
+            saveState(STORAGE_KEY, next);
+            return next;
+          });
+        }
+
+        setError(null);
+      } catch (err) {
+        if (!isSubscribed) return;
+        console.error('Data fetch error:', err);
+        // Fallback to sample data on error
         setState((prev) => {
           const next = {
             ...prev,
-            movies: (payload.movies || []).map(normalizeMovie),
-            genres: payload.genres || prev.genres,
-            actors: payload.actors || prev.actors,
+            movies: initialMovies.map(normalizeMovie),
+            genres: initialGenres,
           };
           saveState(STORAGE_KEY, next);
           return next;
         });
-        setError(null);
-      } catch (err) {
-        if (!isSubscribed) return;
-        console.error(err);
         setError(err.message || 'Đã xảy ra lỗi khi tải dữ liệu');
       } finally {
         if (isSubscribed) {
@@ -102,80 +140,221 @@ export const AppDataProvider = ({ children }) => {
     const findUserByEmail = (email) =>
       state.users.find((user) => user.email.toLowerCase() === email.toLowerCase());
 
-    const login = (email, password) => {
-      console.log('🔍 Đang đăng nhập với email:', email);
-      console.log('📋 Danh sách users hiện tại:', state.users.map(u => ({ email: u.email, id: u.id })));
+    const login = async (email, password) => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-      const user = findUserByEmail(email);
-      console.log('👤 User tìm thấy:', user ? { email: user.email, id: user.id } : 'Không tìm thấy');
+        // Call API login
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
 
-      if (!user) {
-        throw new Error('Không tìm thấy tài khoản với email này');
+        if (!response.ok) {
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Lỗi ${response.status}: Đăng nhập thất bại`);
+          } catch (e) {
+            throw new Error(`Lỗi ${response.status}: Đăng nhập thất bại`);
+          }
+        }
+
+        let data;
+        try {
+          data = await response.json();
+        } catch (e) {
+          throw new Error('Lỗi server: Response không hợp lệ');
+        }
+        const { token, user } = data;
+
+        // Save token to localStorage
+        localStorage.setItem('token', token);
+
+        // Update local state with user info
+        let localUser = findUserByEmail(email);
+
+        if (!localUser) {
+          // Create local user if not exists
+          localUser = {
+            id: user._id || `u${Date.now()}`,
+            name: user.name || email.split('@')[0],
+            email: user.email,
+            password, // Store password locally for fallback
+            role: user.role || 'user',
+            favorites: user.favorites || [],
+            history: user.history || [],
+          };
+          withPersist(
+            (prev) => ({
+              ...prev,
+              users: [...prev.users, localUser],
+              currentUserId: localUser.id,
+            }),
+            setState
+          );
+        } else {
+          // Update existing local user
+          withPersist(
+            (prev) => ({
+              ...prev,
+              currentUserId: localUser.id,
+            }),
+            setState
+          );
+        }
+
+        console.log('✅ Đăng nhập thành công!', { email, token: token.substring(0, 20) + '...' });
+        return localUser;
+      } catch (err) {
+        console.error('❌ Lỗi đăng nhập:', err.message);
+        throw err;
       }
-
-      if (user.password !== password) {
-        console.log('❌ Sai mật khẩu! Mật khẩu đúng:', user.password, '| Mật khẩu nhập:', password);
-        throw new Error('Sai mật khẩu');
-      }
-
-      console.log('✅ Đăng nhập thành công!');
-      withPersist(
-        (prev) => ({
-          ...prev,
-          currentUserId: user.id,
-        }),
-        setState
-      );
-      return user;
     };
 
-    const logout = () => {
-      withPersist(
-        (prev) => ({
-          ...prev,
-          currentUserId: null,
-        }),
-        setState
-      );
-    };
+    const logout = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const token = localStorage.getItem('token');
 
-    const register = ({ name, email, password }) => {
-      if (findUserByEmail(email)) {
-        throw new Error('Email đã tồn tại');
+        if (token) {
+          // Call API logout
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }).catch(() => {
+            // Ignore network errors on logout
+          });
+        }
+
+        // Clear token and local state
+        localStorage.removeItem('token');
+
+        withPersist(
+          (prev) => ({
+            ...prev,
+            currentUserId: null,
+          }),
+          setState
+        );
+
+        console.log('✅ Đã đăng xuất');
+      } catch (err) {
+        console.error('❌ Lỗi đăng xuất:', err.message);
+        // Still clear local state even if API call fails
+        withPersist(
+          (prev) => ({
+            ...prev,
+            currentUserId: null,
+          }),
+          setState
+        );
       }
-      const newUser = {
-        id: `u${Date.now()}`,
-        name,
-        email,
-        password,
-        role: 'user',
-        favorites: [],
-        history: [],
-      };
-      withPersist(
-        (prev) => ({
-          ...prev,
-          users: [...prev.users, newUser],
-          currentUserId: newUser.id,
-        }),
-        setState
-      );
-      return newUser;
     };
 
-    const resetPassword = ({ email, newPassword }) => {
-      const user = findUserByEmail(email);
-      if (!user) throw new Error('Không tìm thấy tài khoản');
-      withPersist(
-        (prev) => ({
-          ...prev,
-          users: prev.users.map((item) =>
-            item.id === user.id ? { ...item, password: newPassword } : item
-          ),
-        }),
-        setState
-      );
-      return true;
+    const register = async ({ name, email, password }) => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+        // Call API register
+        const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, email, password }),
+        });
+
+        if (!response.ok) {
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Lỗi ${response.status}: Đăng ký thất bại`);
+          } catch (e) {
+            throw new Error(`Lỗi ${response.status}: Đăng ký thất bại`);
+          }
+        }
+
+        let data;
+        try {
+          data = await response.json();
+        } catch (e) {
+          throw new Error('Lỗi server: Response không hợp lệ');
+        }
+        const { token, user } = data;
+
+        // Save token to localStorage
+        localStorage.setItem('token', token);
+
+        // Create local user
+        const newUser = {
+          id: user._id || `u${Date.now()}`,
+          name: user.name || name,
+          email: user.email,
+          password, // Store password locally for fallback
+          role: user.role || 'user',
+          favorites: user.favorites || [],
+          history: user.history || [],
+        };
+
+        withPersist(
+          (prev) => ({
+            ...prev,
+            users: [...prev.users, newUser],
+            currentUserId: newUser.id,
+          }),
+          setState
+        );
+
+        console.log('✅ Đăng ký thành công!', { email, token: token.substring(0, 20) + '...' });
+        return newUser;
+      } catch (err) {
+        console.error('❌ Lỗi đăng ký:', err.message);
+        throw err;
+      }
+    };
+
+    const resetPassword = async ({ email, newPassword }) => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const token = localStorage.getItem('token');
+
+        // Call API update password
+        const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            password: newPassword,
+          }),
+        });
+
+        if (!response.ok) {
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Lỗi ${response.status}: Đổi mật khẩu thất bại`);
+          } catch (e) {
+            throw new Error(`Lỗi ${response.status}: Đổi mật khẩu thất bại`);
+          }
+        }
+
+        // Update local state
+        const user = findUserByEmail(email);
+        if (user) {
+          updateUser(user.id, { password: newPassword });
+        }
+
+        console.log('✅ Đổi mật khẩu thành công!');
+        return true;
+      } catch (err) {
+        console.error('❌ Lỗi đổi mật khẩu:', err.message);
+        throw err;
+      }
     };
 
     const currentUser = state.users.find((user) => user.id === state.currentUserId) || null;
@@ -345,6 +524,44 @@ export const AppDataProvider = ({ children }) => {
       );
     };
 
+    // ========== Fetch Movies from API ==========
+    const fetchMovies = async (page = 1, limit = 20) => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        // Use GET /api/movies/new for latest movies with pagination
+        const response = await fetch(`${API_BASE_URL}/api/movies/new?page=${page}&limit=${limit}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const moviesList = data.items || [];
+          
+          // Update state with fetched movies
+          withPersist(
+            (prev) => ({
+              ...prev,
+              movies: moviesList.map(movie => normalizeMovie(normalizeMovieFromAPI(movie))),
+            }),
+            setState
+          );
+          console.log(`Refreshed ${moviesList.length} movies from API (page ${page})`);
+          return {
+            movies: moviesList,
+            pagination: data.pagination || {},
+          };
+        } else {
+          console.warn('Failed to fetch movies from API');
+          return { movies: [], pagination: {} };
+        }
+      } catch (err) {
+        console.error('Error fetching movies:', err);
+        return { movies: [], pagination: {} };
+      }
+    };
+
     const upsertMovie = (movie) => {
       withPersist(
         (prev) => {
@@ -472,6 +689,7 @@ export const AppDataProvider = ({ children }) => {
     const adminActions = {
       upsertMovie,
       deleteMovie,
+      fetchMovies,
       upsertGenre,
       deleteGenre,
       upsertActor,

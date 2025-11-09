@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAppData } from '../context/AppDataContext.jsx';
 import './panel.css';
 
@@ -20,19 +20,19 @@ export const AuthPanel = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setMessage('');
     try {
       if (mode === modes.LOGIN) {
-        login(form.email, form.password);
+        await login(form.email, form.password);
         setMessage('Đăng nhập thành công');
       } else if (mode === modes.REGISTER) {
-        register({ name: form.name, email: form.email, password: form.password });
+        await register({ name: form.name, email: form.email, password: form.password });
         setMessage('Đăng ký thành công');
       } else if (mode === modes.RESET) {
-        resetPassword({ email: form.email, newPassword: form.newPassword });
+        await resetPassword({ email: form.email, newPassword: form.newPassword });
         setMessage('Đổi mật khẩu thành công, hãy đăng nhập lại');
         setMode(modes.LOGIN);
       }

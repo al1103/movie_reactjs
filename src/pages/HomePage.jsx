@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext';
+import { collectionApi, normalizeMovieFromAPI } from '../utils/movieApi';
 import './pages-modern.css';
 
 export const HomePage = () => {
   const navigate = useNavigate();
   const { state, currentUser, recordView, toggleFavorite, logout } = useAppData();
   const [featuredMovie, setFeaturedMovie] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('trending');
+  const [selectedCategory, setSelectedCategory] = useState('phim-bo');
   const [scrolled, setScrolled] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [categoryMovies, setCategoryMovies] = useState({});
+  const [loadingCategories, setLoadingCategories] = useState({});
 
   useEffect(() => {
     if (state.movies.length > 0) {
       // Select a featured movie (highest rated or most viewed)
-      const featured = [...state.movies].sort((a, b) => b.rating - a.rating)[0];
+      const featured = [...state.movies].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
       setFeaturedMovie(featured);
     }
   }, [state.movies]);
@@ -29,30 +32,46 @@ export const HomePage = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Fetch movies for selected category
+  useEffect(() => {
+    const fetchCategoryMovies = async () => {
+      // Check if already fetched to prevent duplicate requests
+      if (categoryMovies[selectedCategory]) return;
+
+      setLoadingCategories(prev => ({ ...prev, [selectedCategory]: true }));
+      try {
+        const data = await collectionApi.getCollections(selectedCategory, 1, 10);
+        const movies = (data.items || []).map(normalizeMovieFromAPI);
+        setCategoryMovies(prev => ({ ...prev, [selectedCategory]: movies }));
+      } catch (err) {
+        console.error('Error fetching category movies:', err);
+        setCategoryMovies(prev => ({ ...prev, [selectedCategory]: [] }));
+      } finally {
+        setLoadingCategories(prev => ({ ...prev, [selectedCategory]: false }));
+      }
+    };
+
+    fetchCategoryMovies();
+  }, [selectedCategory]);
+
   // Search functionality
   useEffect(() => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       const results = state.movies.filter(movie => {
-        const actorMap = state.actors.reduce((acc, actor) => {
-          acc[actor.id] = actor.name;
-          return acc;
-        }, {});
+        const matchTitle = movie.title?.toLowerCase().includes(query) ||
+                          movie.origin_name?.toLowerCase().includes(query);
+        const matchDescription = movie.description?.toLowerCase().includes(query);
+        const matchActor = movie.actor?.some(actor => actor.toLowerCase().includes(query));
+        const matchDirector = movie.director?.some(dir => dir.toLowerCase().includes(query));
 
-        const matchTitle = movie.title.toLowerCase().includes(query);
-        const matchDirector = movie.director.toLowerCase().includes(query);
-        const matchActors = movie.cast.some(actorId =>
-          actorMap[actorId]?.toLowerCase().includes(query)
-        );
-        const matchDescription = movie.description.toLowerCase().includes(query);
-
-        return matchTitle || matchDirector || matchActors || matchDescription;
+        return matchTitle || matchDescription || matchActor || matchDirector;
       });
       setSearchResults(results);
     } else {
       setSearchResults([]);
     }
-  }, [searchQuery, state.movies, state.actors]);
+  }, [searchQuery, state.movies]);
 
   const handleMovieClick = (movieId) => {
     recordView(movieId);
@@ -78,38 +97,16 @@ export const HomePage = () => {
   };
 
   const categories = [
-    { id: 'trending', name: 'Trending Now' },
-    { id: 'popular', name: 'Popular' },
-    { id: 'netflix', name: 'Netflix Original' },
-    { id: 'premiere', name: 'Premiere' },
-    { id: 'recent', name: 'Recently Added' },
+    { id: 'phim-bo', name: 'Phim Bộ' },
+    { id: 'phim-le', name: 'Phim Lẻ' },
+    { id: 'tv-shows', name: 'TV Shows' },
+    { id: 'hoat-hinh', name: 'Hoạt Hình' },
+    { id: 'phim-vietsub', name: 'Phim Vietsub' },
+    { id: 'phim-thuyet-minh', name: 'Phim Thuyết Minh' },
   ];
 
-  const genres = [
-    { id: 'action', name: 'Action' },
-    { id: 'adventure', name: 'Adventure' },
-    { id: 'anime', name: 'Anime' },
-    { id: 'biography', name: 'Biography' },
-    { id: 'crime', name: 'Crime' },
-    { id: 'comedy', name: 'Comedy' },
-    { id: 'documentary', name: 'Documentary' },
-    { id: 'drama', name: 'Drama' },
-  ];
-
-  const getMoviesByCategory = (category) => {
-    switch (category) {
-      case 'trending':
-        return [...state.movies].sort((a, b) => b.views - a.views).slice(0, 10);
-      case 'popular':
-        return [...state.movies].sort((a, b) => b.rating - a.rating).slice(0, 10);
-      case 'recent':
-        return [...state.movies].sort((a, b) => b.year - a.year).slice(0, 10);
-      default:
-        return state.movies.slice(0, 10);
-    }
-  };
-
-  const displayMovies = getMoviesByCategory(selectedCategory);
+  const displayMovies = categoryMovies[selectedCategory] || state.movies.slice(0, 10);
+  const isLoadingCategory = loadingCategories[selectedCategory] === true;
 
   return (
     <div className="netflix-home">
@@ -191,9 +188,9 @@ export const HomePage = () => {
               <span className="badge-top10">TOP<br/>10</span>
             </div>
             <div className="hero-metadata">
-              <span className="hero-rating">★ {featuredMovie.rating}</span>
+              <span className="hero-rating">★ {(featuredMovie.rating || 0).toFixed(1)}</span>
               <span className="hero-year">{featuredMovie.year}</span>
-              <span className="hero-seasons">{featuredMovie.duration} phút</span>
+              <span className="hero-seasons">{featuredMovie.duration || 'N/A'}</span>
             </div>
             <h1 className="hero-title">{featuredMovie.title}</h1>
             <p className="hero-description">{featuredMovie.description}</p>
@@ -232,7 +229,7 @@ export const HomePage = () => {
 
       {/* Genre Pills */}
       <div className="genre-pills">
-        {genres.map(genre => (
+        {state.genres.slice(0, 8).map(genre => (
           <button key={genre.id} className="genre-pill">
             {genre.name}
           </button>
@@ -243,30 +240,38 @@ export const HomePage = () => {
       <div className="movies-section">
         <h2 className="section-title">{categories.find(c => c.id === selectedCategory)?.name}</h2>
         <div className="movies-grid-container">
-          <div className="movies-grid">
-            {displayMovies.map(movie => (
-              <div
-                key={movie.id}
-                className="movie-card"
-                onClick={() => handleMovieClick(movie.id)}
-              >
-                <img src={movie.poster} alt={movie.title} />
-                <div className="movie-info">
-                  <h3>{movie.title}</h3>
-                  <div className="movie-meta">
-                    <span className="movie-rating">★ {movie.rating}</span>
-                    <span>{movie.year}</span>
+          {isLoadingCategory ? (
+            <div className="loading-spinner">Đang tải...</div>
+          ) : (
+            <div className="movies-grid">
+              {displayMovies.length > 0 ? displayMovies.map(movie => (
+                <div
+                  key={movie.id}
+                  className="movie-card"
+                  onClick={() => handleMovieClick(movie.id)}
+                >
+                  <img src={movie.poster} alt={movie.title} />
+                  <div className="movie-info">
+                    <h3>{movie.title}</h3>
+                    <div className="movie-meta">
+                      <span className="movie-rating">★ {(movie.rating || 0).toFixed(1)}</span>
+                      <span>{movie.year}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              )) : (
+                <div className="empty-state">
+                  <p>Không có phim nào</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* All Movies Section */}
       <div className="movies-section">
-        <h2 className="section-title">All Movies</h2>
+        <h2 className="section-title">Phim Phổ Biến</h2>
         <div className="movies-grid-container">
           <div className="movies-grid">
             {state.movies.slice(0, 12).map(movie => (
@@ -279,7 +284,7 @@ export const HomePage = () => {
                 <div className="movie-info">
                   <h3>{movie.title}</h3>
                   <div className="movie-meta">
-                    <span className="movie-rating">★ {movie.rating}</span>
+                    <span className="movie-rating">★ {(movie.rating || 0).toFixed(1)}</span>
                     <span>{movie.year}</span>
                   </div>
                 </div>
@@ -364,11 +369,11 @@ export const HomePage = () => {
                         <div className="search-result-info">
                           <h4>{movie.title}</h4>
                           <div className="search-result-meta">
-                            <span className="result-rating">★ {movie.rating}</span>
+                            <span className="result-rating">★ {(movie.rating || 0).toFixed(1)}</span>
                             <span>{movie.year}</span>
-                            <span>{movie.duration} phút</span>
+                            <span>{movie.duration || 'N/A'}</span>
                           </div>
-                          <p className="result-description">{movie.description.substring(0, 100)}...</p>
+                          <p className="result-description">{(movie.description || '').substring(0, 100)}...</p>
                         </div>
                       </div>
                     ))}

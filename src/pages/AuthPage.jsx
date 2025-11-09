@@ -25,7 +25,7 @@ export const AuthPage = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setMessage('');
@@ -33,16 +33,16 @@ export const AuthPage = () => {
 
     try {
       if (mode === modes.LOGIN) {
-        login(form.email, form.password);
+        await login(form.email, form.password);
         setMessage('Đăng nhập thành công!');
         setTimeout(() => navigate('/'), 500);
       } else if (mode === modes.REGISTER) {
-        register({ name: form.name, email: form.email, password: form.password });
+        await register({ name: form.name, email: form.email, password: form.password });
         setMessage('Đăng ký thành công! Vui lòng đăng nhập.');
         setMode(modes.LOGIN);
         setForm({ name: '', email: '', password: '', newPassword: '' });
       } else if (mode === modes.RESET) {
-        resetPassword({ email: form.email, newPassword: form.newPassword });
+        await resetPassword({ email: form.email, newPassword: form.newPassword });
         setMessage('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
         setTimeout(() => setMode(modes.LOGIN), 1500);
         setForm({ name: '', email: '', password: '', newPassword: '' });

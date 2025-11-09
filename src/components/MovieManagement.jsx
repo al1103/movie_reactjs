@@ -1,4 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { Toast, useToast } from './Toast';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const emptyMovieForm = {
   id: '',
@@ -8,7 +11,7 @@ const emptyMovieForm = {
   country: '',
   duration: 120,
   genres: [],
-  director: '',
+  director: [],  // Changed to array
   cast: [],
   poster: '',
   banner: '',
@@ -16,40 +19,309 @@ const emptyMovieForm = {
   episodes: '',
 };
 
-export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
+export const MovieManagement = ({ movies, genres: genresProp, actors, adminActions }) => {
   const [movieForm, setMovieForm] = useState(emptyMovieForm);
   const [selectedMovieId, setSelectedMovieId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('form'); // 'form' or 'list'
+  const [uploading, setUploading] = useState(false);
+  const [posterPreview, setPosterPreview] = useState('');
+  const [bannerPreview, setBannerPreview] = useState('');
+  const [trailerUrl, setTrailerUrl] = useState('');
+  const [genres, setGenres] = useState(genresProp || []);
+  const { toasts, show: showToast, remove: removeToast } = useToast();
 
-  const movieOptions = useMemo(
-    () => movies.map((movie) => ({ value: movie.id, label: movie.title })),
-    [movies]
-  );
+  // ========== Generate Slug from Title ==========
+  const generateSlug = (title) => {
+    return title
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  };
+
+  // ========== Normalize movie data to ensure all fields have correct types ==========
+  const normalizeMovieForm = (movie) => {
+    // Handle genres - convert objects to IDs or slug if needed
+    let genresList = [];
+    if (Array.isArray(movie.genres)) {
+      genresList = movie.genres.map(g => {
+        // If genre is object with _id or id, use that; otherwise use slug or the value itself
+        if (typeof g === 'object') {
+          return g._id || g.id || g.slug || g;
+        }
+        return g;
+      });
+    }
+
+    return {
+      id: movie.id || '',
+      title: movie.title || '',
+      description: movie.description || '',
+      year: movie.year || new Date().getFullYear(),
+      country: movie.country || '',
+      duration: movie.duration || 120,
+      genres: genresList,
+      director: Array.isArray(movie.director) ? movie.director : [],
+      cast: Array.isArray(movie.cast) ? movie.cast : [],
+      poster: movie.poster || '',
+      banner: movie.banner || '',
+      trailer: movie.trailer || '',
+      slug: movie.slug || generateSlug(movie.title || ''),
+      rating: movie.rating || 0,
+      ratings: Array.isArray(movie.ratings) ? movie.ratings : [],
+      comments: Array.isArray(movie.comments) ? movie.comments : [],
+      views: movie.views || 0,
+    };
+  };
+
+  // ========== Fetch Genres from API ==========
+  useEffect(() => {
+    const fetchGenres = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/genres`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // API returns { items: [...] } or { data: [...] }
+          const genresList = data.items || data.data || [];
+          // Map _id to id for consistency with frontend
+          const mappedGenres = genresList.map(genre => ({
+            id: genre._id || genre.id,
+            name: genre.name,
+            slug: genre.slug,
+          }));
+          setGenres(mappedGenres);
+        } else {
+          console.warn('Failed to fetch genres, using default');
+          setGenres(genresProp || []);
+        }
+      } catch (err) {
+        console.error('Error fetching genres:', err);
+        setGenres(genresProp || []);
+      }
+    };
+
+    fetchGenres();
+  }, [genresProp]);
+
+  // ========== Refresh Movies when switching to list view ==========
+  useEffect(() => {
+    if (viewMode === 'list') {
+      console.log('Switched to list view - fetching movies from API');
+      // If adminActions has a fetchMovies method, call it here
+      if (adminActions?.fetchMovies) {
+        adminActions.fetchMovies();
+      }
+    }
+  }, [viewMode]); // Only depend on viewMode, not adminActions
+
+  // ========== Fetch movie details from API when selected ==========
+  useEffect(() => {
+    if (!selectedMovieId) return;
+    
+    const fetchMovieDetails = async () => {
+      try {
+        console.log('Fetching movie details for:', selectedMovieId);
+        const response = await fetch(`${API_BASE_URL}/api/movies/${selectedMovieId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (!response.ok) {
+          console.warn('Failed to fetch movie details:', response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+        // API returns { movie: {...} } or { data: {...} }
+        const movieData = data.movie || data.data || data;
+        
+        console.log('Movie details from API:', movieData);
+        console.log('Raw API response:', data);
+        
+        // Map API fields to form fields
+        const mappedMovieData = {
+          ...movieData,
+          id: movieData._id || movieData.id,
+          title: movieData.name || movieData.title,
+          genres: movieData.category || movieData.genres || [],
+        };
+        
+        const normalizedMovie = normalizeMovieForm(mappedMovieData);
+        console.log('Normalized movie:', normalizedMovie);
+        
+        setMovieForm({
+          ...normalizedMovie,
+          episodes: (movieData.episodes || [])
+            .map((episode) => {
+              const duration = Number.isInteger(episode.duration) ? episode.duration : 0;
+              return `${episode.title}|${duration}`;
+            })
+            .join('\n'),
+        });
+        setPosterPreview(normalizedMovie.poster);
+        setBannerPreview(normalizedMovie.banner);
+      } catch (err) {
+        console.error('Error fetching movie details:', err);
+      }
+    };
+
+    fetchMovieDetails();
+  }, [selectedMovieId]); // Fetch when selectedMovieId changes
+
 
   const handleMovieSelect = (movieId) => {
+    console.log('handleMovieSelect called with movieId:', movieId);
     setSelectedMovieId(movieId);
     if (!movieId) {
       setMovieForm(emptyMovieForm);
-      return;
+      setPosterPreview('');
+      setBannerPreview('');
     }
-    const movie = movies.find((item) => item.id === movieId);
-    if (!movie) return;
-    setMovieForm({
-      ...movie,
-      episodes: (movie.episodes || [])
-        .map((episode) => `${episode.title}|${episode.duration}`)
-        .join('\n'),
-    });
+    // API fetch happens in useEffect when selectedMovieId changes
   };
+
+  // ========== Upload Image Handler ==========
+  const handleImageUpload = async (file, type) => {
+    if (!file) return null;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(`${API_BASE_URL}/api/upload/image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload ${type} failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const imageUrl = data.data.url;
+
+      // Update form and preview
+      if (type === 'poster') {
+        setMovieForm(prev => ({ ...prev, poster: imageUrl }));
+        setPosterPreview(imageUrl);
+        showToast('✅ Upload poster thành công', 'success');
+      } else if (type === 'banner') {
+        setMovieForm(prev => ({ ...prev, banner: imageUrl }));
+        setBannerPreview(imageUrl);
+        showToast('✅ Upload banner thành công', 'success');
+      }
+
+      return imageUrl;
+    } catch (err) {
+      showToast(`❌ Lỗi upload ${type}: ${err.message}`, 'error');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePosterFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      await handleImageUpload(file, 'poster');
+    }
+  };
+
+  const handleBannerFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      await handleImageUpload(file, 'banner');
+    }
+  };
+
+  // ========== Upload Video Handler ==========
+  const handleVideoUpload = async (file) => {
+    if (!file) return null;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const response = await fetch(`${API_BASE_URL}/api/upload/video`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload video failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const videoUrl = data.data.url;
+
+      setMovieForm(prev => ({ ...prev, trailer: videoUrl }));
+      setTrailerUrl(videoUrl);
+      showToast('✅ Upload video thành công', 'success');
+
+      return videoUrl;
+    } catch (err) {
+      showToast(`❌ Lỗi upload video: ${err.message}`, 'error');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleVideoFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      await handleVideoUpload(file);
+    }
+  };
+
+  // ========== Extract Error Message from API Response ==========
+  const getErrorMessage = async (response) => {
+    try {
+      const data = await response.json();
+      // Try different error message paths
+      return data.error || data.message || data.msg || `Error: ${response.statusText}`;
+    } catch {
+      return response.statusText || 'Unknown error occurred';
+    }
+  };
+
 
   const handleMovieFormChange = (event) => {
     const { name, value } = event.target;
     if (name === 'genres' || name === 'cast') {
       const options = Array.from(event.target.selectedOptions).map((option) => option.value);
       setMovieForm((prev) => ({ ...prev, [name]: options }));
+    } else if (name === 'title') {
+      // Only auto-generate slug when creating NEW movie (no selectedMovieId)
+      if (selectedMovieId) {
+        // Editing existing movie - don't change slug
+        setMovieForm((prev) => ({ ...prev, [name]: value }));
+      } else {
+        // Creating new movie - auto-generate slug
+        const slug = generateSlug(value);
+        setMovieForm((prev) => ({ ...prev, [name]: value, slug: slug }));
+      }
     } else {
       setMovieForm((prev) => ({ ...prev, [name]: value }));
     }
@@ -61,49 +333,271 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line, index) => {
-        const [title, duration] = line.split('|').map((item) => item.trim());
+        // Split by | and extract only the numeric duration
+        const parts = line.split('|');
+        const title = parts[0]?.trim() || `Tập ${index + 1}`;
+        // Extract only digits from duration part
+        const durationStr = parts[1]?.trim() || '0';
+        const durationMatch = durationStr.match(/\d+/);
+        const duration = durationMatch ? parseInt(durationMatch[0]) : 0;
+        
         return {
           id: `${movieForm.id || `temp-${Date.now()}`}-ep-${index}`,
           title,
-          duration: Number(duration) || 0,
+          duration,
         };
       });
 
-  const handleMovieSubmit = (event) => {
+  const handleMovieSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setMessage('');
-    if (!movieForm.title.trim()) {
+    if (!movieForm.title?.trim()) {
       setError('Tên phim không được để trống');
       return;
     }
-    if (!movieForm.genres.length) {
+    if (!Array.isArray(movieForm.genres) || !movieForm.genres.length) {
       setError('Vui lòng chọn ít nhất một thể loại');
       return;
     }
-    const payload = {
-      ...movieForm,
-      year: Number(movieForm.year),
-      duration: Number(movieForm.duration),
-      episodes: parseEpisodes(movieForm.episodes),
-      ratings: movieForm.ratings || [],
-      comments: movieForm.comments || [],
-      views: movieForm.views || 0,
-    };
-    if (!payload.id) {
-      payload.id = `m${Date.now()}`;
+    if (!movieForm.poster?.trim()) {
+      setError('Vui lòng upload poster');
+      return;
     }
-    adminActions.upsertMovie(payload);
-    setMessage('Đã lưu phim thành công');
-    setSelectedMovieId(payload.id);
+    if (!movieForm.banner?.trim()) {
+      setError('Vui lòng upload banner');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const payload = {
+        ...movieForm,
+        year: Number(movieForm.year),
+        duration: Number(movieForm.duration),
+        ratings: movieForm.ratings || [],
+        comments: movieForm.comments || [],
+        views: movieForm.views || 0,
+      };
+
+      const isNewMovie = !selectedMovieId;
+      
+      // Get the correct slug to use for API calls
+      let movieSlug;
+      if (isNewMovie) {
+        // For new movie, use the generated slug from form
+        movieSlug = payload.slug;
+      } else {
+        // For existing movie, prioritize slug from current form data, then from movie object
+        const selectedMovie = movies.find(m => m.id === selectedMovieId);
+        movieSlug = payload.slug || selectedMovie?.slug || selectedMovieId;
+      }
+      
+      console.log('DEBUG: isNewMovie =', isNewMovie, 'movieSlug =', movieSlug, 'selectedMovieId =', selectedMovieId);
+      
+      if (isNewMovie) {
+        // ========== CREATE NEW MOVIE via POST /api/movies/upload ==========
+        const createPayload = {
+          name: payload.title,  // Backend expects 'name', not 'title'
+          description: payload.description,
+          poster: payload.poster,
+          banner: payload.banner,
+          year: payload.year,
+          country: payload.country,
+          duration: payload.duration,
+          director: Array.isArray(payload.director) ? payload.director : (payload.director ? [payload.director] : []),
+          genres: payload.genres,
+          cast: payload.cast,
+          trailer: payload.trailer,
+          slug: payload.slug,
+          status: 'ongoing',  // Backend requires: 'ongoing' or 'completed'
+          quality: payload.quality || '720p',
+        };
+
+        const response = await fetch(`${API_BASE_URL}/api/movies/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify(createPayload),
+        });
+
+        if (!response.ok) {
+          const errorMsg = await getErrorMessage(response);
+          throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        console.log('API response:', data);
+        
+        // Handle different API response formats
+        movieSlug = data.data?.slug || data.data?.id || data.slug || data.id;
+        
+        if (!movieSlug) {
+          throw new Error('Backend did not return movie slug or id');
+        }
+        
+        console.log('Got movieSlug:', movieSlug);
+        
+        // Parse episodes từ textarea
+        const episodes = parseEpisodes(movieForm.episodes);
+        
+        // ========== CREATE EPISODES via POST /api/movies/:slug/episodes ==========
+        if (episodes.length > 0) {
+          for (const episode of episodes) {
+            const episodePayload = {
+              episodeNumber: episode.title.match(/\d+/) ? parseInt(episode.title.match(/\d+/)[0]) : 1,
+              title: episode.title,
+              description: episode.description || '',
+              duration: episode.duration || 0,
+              videoUrl: episode.videoUrl || '',
+              quality: '720p',
+              language: 'Vietsub',
+            };
+
+            const episodeResponse = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}/episodes`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              },
+              body: JSON.stringify(episodePayload),
+            });
+
+            if (!episodeResponse.ok) {
+              console.warn(`Failed to create episode: ${episodeResponse.statusText}`);
+            }
+          }
+        }
+        
+        // Add to local state
+        adminActions.upsertMovie({ ...payload, id: movieSlug, slug: movieSlug });
+        showToast('✅ Đã tạo phim mới, cập nhật episodes và lưu vào database', 'success');
+        setSelectedMovieId(movieSlug);
+      } else {
+        // ========== UPDATE EXISTING MOVIE via PUT /api/movies/:slug ==========
+        const updatePayload = {
+          name: payload.title,  // Backend expects 'name', not 'title'
+          description: payload.description,
+          poster: payload.poster,
+          banner: payload.banner,
+          year: payload.year,
+          country: payload.country,
+          duration: payload.duration,
+          director: Array.isArray(payload.director) ? payload.director : (payload.director ? [payload.director] : []),
+          genres: payload.genres,
+          cast: payload.cast,
+          trailer: payload.trailer,
+          status: 'ongoing',  // Backend requires: 'ongoing' or 'completed'
+          quality: payload.quality || '720p',
+        };
+
+        const response = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify(updatePayload),
+        });
+
+        if (!response.ok) {
+          const errorMsg = await getErrorMessage(response);
+          throw new Error(errorMsg);
+        }
+
+        // Parse episodes từ textarea
+        const episodes = parseEpisodes(movieForm.episodes);
+        
+        // ========== CREATE/UPDATE EPISODES via POST /api/movies/:slug/episodes ==========
+        if (episodes.length > 0) {
+          for (const episode of episodes) {
+            const episodePayload = {
+              episodeNumber: episode.title.match(/\d+/) ? parseInt(episode.title.match(/\d+/)[0]) : 1,
+              title: episode.title,
+              description: episode.description || '',
+              duration: episode.duration || 0,
+              videoUrl: episode.videoUrl || '',
+              quality: '720p',
+              language: 'Vietsub',
+            };
+
+            const episodeResponse = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}/episodes`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              },
+              body: JSON.stringify(episodePayload),
+            });
+
+            if (!episodeResponse.ok) {
+              console.warn(`Failed to create episode: ${episodeResponse.statusText}`);
+            }
+          }
+        }
+
+        // Update local state - use selectedMovieId to find and update the movie
+        adminActions.upsertMovie({ ...payload, id: selectedMovieId, slug: movieSlug });
+        showToast('✅ Đã cập nhật phim, episodes vào database', 'success');
+        
+        // Refresh movies list from API to get the latest data
+        if (adminActions?.fetchMovies) {
+          await adminActions.fetchMovies();
+        }
+      }
+
+      console.log('Movie saved successfully with slug:', movieSlug);
+      // Keep selectedMovieId as is for existing movies
+      if (isNewMovie) {
+        setSelectedMovieId(movieSlug);
+      }
+    } catch (err) {
+      console.error('Movie submit error:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+      });
+      showToast(`❌ Lỗi lưu phim: ${err.message}`, 'error');
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const handleMovieDelete = (movieId) => {
+  const handleMovieDelete = async (movieId) => {
     if (!window.confirm('Xóa phim này?')) return;
-    adminActions.deleteMovie(movieId);
-    setSelectedMovieId('');
-    setMovieForm(emptyMovieForm);
-    setMessage('Đã xóa phim');
+
+    setUploading(true);
+    try {
+      // Get the actual movie slug from the movie object
+      const movie = movies.find(m => m.id === movieId);
+      const movieSlug = movie?.slug || movieId;
+
+      // ========== DELETE via DELETE /api/movies/:slug ==========
+      const response = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorMsg = await getErrorMessage(response);
+        throw new Error(errorMsg);
+      }
+
+      // Delete from local state
+      adminActions.deleteMovie(movieId);
+      setSelectedMovieId('');
+      setMovieForm(emptyMovieForm);
+      showToast('✅ Đã xóa phim khỏi database', 'success');
+    } catch (err) {
+      console.error('Movie delete error:', err);
+      showToast(`❌ Lỗi xóa phim: ${err.message}`, 'error');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const filteredMovies = useMemo(() => {
@@ -118,6 +612,17 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
 
   return (
     <section className="movie-management-modern">
+      {/* Toast Notifications */}
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
+
       {/* View Mode Toggle */}
       <div className="view-mode-toggle">
         <button
@@ -226,18 +731,27 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
         <div className="movie-form-view">
           <div className="form-header-admin">
             <h3>{selectedMovieId ? 'Chỉnh sửa phim' : 'Thêm phim mới'}</h3>
-            <select
-              className="movie-selector"
-              value={selectedMovieId}
-              onChange={(event) => handleMovieSelect(event.target.value)}
-            >
-              <option value="">-- Phim mới --</option>
-              {movieOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {selectedMovieId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMovieId('');
+                  setMovieForm(emptyMovieForm);
+                  setPosterPreview('');
+                  setBannerPreview('');
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                ➕ Thêm phim mới
+              </button>
+            )}
           </div>
 
           {message && <div className="alert-success">{message}</div>}
@@ -247,6 +761,16 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
         <label>
           Tên phim
           <input name="title" value={movieForm.title} onChange={handleMovieFormChange} required />
+        </label>
+        <label>
+          Slug (tự động sinh từ tên phim)
+          <input 
+            name="slug" 
+            value={movieForm.slug || ''} 
+            readOnly
+            style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
+            title="Slug được tự động sinh từ tên phim"
+          />
         </label>
         <label>
           Mô tả
@@ -277,8 +801,17 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
           </label>
         </div>
         <label>
-          Đạo diễn
-          <input name="director" value={movieForm.director} onChange={handleMovieFormChange} />
+          Đạo diễn (mỗi dòng một người)
+          <textarea
+            name="director"
+            rows="3"
+            value={Array.isArray(movieForm.director) ? movieForm.director.join('\n') : movieForm.director}
+            onChange={(e) => {
+              const directors = e.target.value.split('\n').map(d => d.trim()).filter(Boolean);
+              setMovieForm(prev => ({ ...prev, director: directors }));
+            }}
+            placeholder="Đạo diễn 1\nĐạo diễn 2\nĐạo diễn 3"
+          />
         </label>
         <label>
           Thể loại
@@ -297,32 +830,103 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
           </select>
         </label>
         <label>
-          Diễn viên
-          <select
-            name="cast"
-            multiple
-            value={movieForm.cast}
-            onChange={handleMovieFormChange}
-            size={Math.min(6, Math.max(actors.length, 3))}
-          >
-            {actors.map((actor) => (
-              <option key={actor.id} value={actor.id}>
-                {actor.name}
-              </option>
-            ))}
-          </select>
+          Poster (Upload ảnh)
+          <div style={{ marginTop: '0.5rem' }}>
+            {posterPreview && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <img
+                  src={posterPreview}
+                  alt="Poster preview"
+                  style={{ maxWidth: '150px', maxHeight: '200px', borderRadius: '6px', border: '2px solid #e11d48' }}
+                />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handlePosterFileSelect}
+              disabled={uploading}
+            />
+            {movieForm.poster && (
+              <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem', wordBreak: 'break-all' }}>
+                ✅ {movieForm.poster}
+              </p>
+            )}
+          </div>
         </label>
         <label>
-          Poster (URL Cloudinary)
-          <input name="poster" value={movieForm.poster} onChange={handleMovieFormChange} />
+          Banner (Upload ảnh)
+          <div style={{ marginTop: '0.5rem' }}>
+            {bannerPreview && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <img
+                  src={bannerPreview}
+                  alt="Banner preview"
+                  style={{ maxWidth: '300px', maxHeight: '120px', borderRadius: '6px', border: '2px solid #3b82f6' }}
+                />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleBannerFileSelect}
+              disabled={uploading}
+            />
+            {movieForm.banner && (
+              <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem', wordBreak: 'break-all' }}>
+                ✅ {movieForm.banner}
+              </p>
+            )}
+          </div>
         </label>
         <label>
-          Banner (URL Cloudinary)
-          <input name="banner" value={movieForm.banner} onChange={handleMovieFormChange} />
-        </label>
-        <label>
-          Trailer (URL YouTube)
-          <input name="trailer" value={movieForm.trailer} onChange={handleMovieFormChange} />
+          Video Trailer (Upload file hoặc URL YouTube)
+          <div style={{ marginTop: '0.5rem' }}>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleVideoFileSelect}
+              disabled={uploading}
+            />
+            <p style={{ fontSize: '0.8rem', color: '#666', margin: '0.5rem 0' }}>HOẶC nhập URL:</p>
+            <input 
+              name="trailer" 
+              value={movieForm.trailer} 
+              onChange={handleMovieFormChange}
+              placeholder="https://youtube.com/... hoặc video URL"
+            />
+            {movieForm.trailer && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem', padding: '0.5rem', backgroundColor: '#dcfce7', borderRadius: '4px', border: '1px solid #22c55e' }}>
+                <p style={{ fontSize: '0.85rem', color: '#22c55e', margin: 0, wordBreak: 'break-all', flex: 1 }}>
+                  ✅ {movieForm.trailer}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMovieForm(prev => ({ ...prev, trailer: '' }));
+                    setTrailerUrl('');
+                    setMessage('🗑️ Đã xóa video link');
+                    setTimeout(() => setMessage(''), 2000);
+                  }}
+                  style={{
+                    marginLeft: '0.75rem',
+                    padding: '0.4rem 0.8rem',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  ✕ Xóa
+                </button>
+              </div>
+            )}
+          </div>
         </label>
         <label>
           Danh sách tập (mỗi dòng: Tiêu đề|Số phút)
@@ -340,7 +944,7 @@ export const MovieManagement = ({ movies, genres, actors, adminActions }) => {
                   <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" strokeWidth="2"/>
                   <path d="M17 21v-8H7v8M7 3v5h8" strokeWidth="2"/>
                 </svg>
-                Lưu phim
+                {selectedMovieId ? 'Cập nhật' : 'Thêm phim'}
               </button>
               {selectedMovieId && (
                 <button

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppData } from '../context/AppDataContext.jsx';
 import './panel.css';
 
@@ -101,24 +101,30 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
             <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#374151' }}>{movie.description}</p>
             <div className="tag-list">
               <span className="tag">{movie.year}</span>
-              <span className="tag">{movie.country}</span>
-              <span className="tag">{movie.duration} phút</span>
-              {movie.genres.map((genreId) => (
-                <span className="tag" key={genreId}>
-                  {genreMap[genreId] || 'Khác'}
+              {movie.country && (
+                <>
+                  {Array.isArray(movie.country) ? movie.country.map(c => (
+                    <span className="tag" key={c.slug}>{c.name}</span>
+                  )) : <span className="tag">{movie.country}</span>}
+                </>
+              )}
+              <span className="tag">{movie.duration || 'N/A'}</span>
+              {movie.category && Array.isArray(movie.category) && movie.category.map((cat) => (
+                <span className="tag" key={cat.slug}>
+                  {cat.name}
                 </span>
               ))}
             </div>
             <p>
-              Đạo diễn: <strong>{movie.director}</strong>
+              Đạo diễn: <strong>{Array.isArray(movie.director) ? movie.director.join(', ') : movie.director || 'N/A'}</strong>
             </p>
             <p>
-              Diễn viên: <strong>{movie.cast.map((id) => actorMap[id]).join(', ')}</strong>
+              Diễn viên: <strong>{Array.isArray(movie.actor) ? movie.actor.join(', ') : movie.actor || 'N/A'}</strong>
             </p>
             <p>
-              Điểm trung bình: <strong>{movie.rating.toFixed(1)}</strong> ({movie.ratings.length} đánh giá)
+              Điểm trung bình: <strong>{(movie.rating || 0).toFixed(1)}</strong> ({(movie.ratings || []).length} đánh giá)
             </p>
-            <p>Lượt xem: {movie.views?.toLocaleString('vi-VN')}</p>
+            <p>Lượt xem: {(movie.views || 0).toLocaleString('vi-VN')}</p>
             <div className="actions-row">
               <button className="primary" onClick={handleFavorite}>
                 {isFavorite ? 'Bỏ yêu thích' : 'Thêm yêu thích'}
@@ -130,18 +136,14 @@ export const MovieDetail = ({ movie, genres, actors, suggestions, onClose }) => 
           </div>
         </div>
 
-        {movie.episodes?.length ? (
+        {movie.episode_total && (
           <div style={{ marginTop: '1.5rem' }}>
-            <h3>Danh sách tập ({movie.episodes.length})</h3>
-            <ul>
-              {movie.episodes.map((episode) => (
-                <li key={episode.id}>
-                  <strong>{episode.title}</strong> - {episode.duration} phút
-                </li>
-              ))}
-            </ul>
+            <h3>Thông tin tập phim</h3>
+            <p>Tập hiện tại: <strong>{movie.episode_current}</strong></p>
+            <p>Tổng tập: <strong>{movie.episode_total}</strong></p>
+            <p>Trạng thái: <strong>{movie.status}</strong></p>
           </div>
-        ) : null}
+        )}
 
         <div style={{ marginTop: '1.5rem' }}>
           <h3>Đánh giá & bình luận</h3>
