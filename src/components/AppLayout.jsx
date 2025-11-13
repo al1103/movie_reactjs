@@ -61,18 +61,11 @@ export const AppLayout = ({ children }) => {
                 <NavLink to="/admin/genres" className="app-dropdown-link">
                   🎭 Thể loại
                 </NavLink>
-                <NavLink to="/admin/actors" className="app-dropdown-link">
-                  👥 Diễn viên
-                </NavLink>
+        
                 <NavLink to="/admin/users" className="app-dropdown-link">
                   👨‍💼 Người dùng
                 </NavLink>
-                <NavLink to="/admin/comments" className="app-dropdown-link">
-                  💬 Bình luận
-                </NavLink>
-                <NavLink to="/admin/stats" className="app-dropdown-link">
-                  📊 Thống kê
-                </NavLink>
+             
               </div>
             </div>
           )}

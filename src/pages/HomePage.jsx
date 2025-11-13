@@ -2,26 +2,86 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext';
 import { collectionApi, normalizeMovieFromAPI } from '../utils/movieApi';
+import { SearchBar } from '../components/SearchBar';
+import { Header } from '../components/Header';
+import { Toast, useToast } from '../components/Toast';
 import './pages-modern.css';
 
 export const HomePage = () => {
   const navigate = useNavigate();
   const { state, currentUser, recordView, toggleFavorite, logout } = useAppData();
+  const { toasts, show: showToast, remove: removeToast } = useToast();
   const [featuredMovie, setFeaturedMovie] = useState(null);
+  const [topMovies, setTopMovies] = useState([]);
+  const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('phim-bo');
+  const [selectedGenre, setSelectedGenre] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [genres, setGenres] = useState([]);
+  const [loadingGenres, setLoadingGenres] = useState(false);
   const [categoryMovies, setCategoryMovies] = useState({});
   const [loadingCategories, setLoadingCategories] = useState({});
+  const [genreMovies, setGenreMovies] = useState({});
+  const [loadingGenreMovies, setLoadingGenreMovies] = useState({});
+  const [favoriteStates, setFavoriteStates] = useState({});
 
   useEffect(() => {
-    if (state.movies.length > 0) {
-      // Select a featured movie (highest rated or most viewed)
-      const featured = [...state.movies].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0];
-      setFeaturedMovie(featured);
-    }
+    const fetchTopMovies = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${API_BASE_URL}/api/movies/top?limit=5`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Top movies from API:', data);
+          
+          // Handle different response formats
+          let movies = Array.isArray(data) ? data : (data.movies || data.items || data.data || []);
+          if (!Array.isArray(movies)) movies = [movies];
+          
+          if (movies.length > 0) {
+            // Normalize the movies
+            const normalizedMovies = movies.map(movie => ({
+              id: movie._id || movie.id,
+              title: movie.name || movie.title,
+              origin_name: movie.origin_name,
+              poster: movie.poster_url || movie.thumb_url || movie.poster,
+              backdrop: movie.poster_url || movie.thumb_url || movie.poster,
+              rating: movie.rating || 0,
+              year: movie.year,
+              duration: movie.time || movie.duration,
+              description: movie.content || movie.description,
+              slug: movie.slug,
+              tmdb: movie.tmdb,
+            }));
+            setTopMovies(normalizedMovies);
+            setFeaturedMovie(normalizedMovies[0]);
+          }
+        } else {
+          console.warn('❌ Top movies API failed:', response.status);
+          // Fallback to local state
+          if (state.movies.length > 0) {
+            const sorted = [...state.movies].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            setTopMovies(sorted.slice(0, 5));
+            setFeaturedMovie(sorted[0]);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Error fetching top movies:', err);
+        // Fallback to local state
+        if (state.movies.length > 0) {
+          const sorted = [...state.movies].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          setTopMovies(sorted.slice(0, 5));
+          setFeaturedMovie(sorted[0]);
+        }
+      }
+    };
+
+    fetchTopMovies();
   }, [state.movies]);
 
   useEffect(() => {
@@ -30,6 +90,41 @@ export const HomePage = () => {
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch genres from API
+  useEffect(() => {
+    const fetchGenres = async () => {
+      setLoadingGenres(true);
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${API_BASE_URL}/api/genres`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Genres from API:', data);
+          
+          // Handle different response formats
+          const genreList = Array.isArray(data) ? data : (data.genres || data.items || data.data || []);
+          setGenres(genreList);
+          
+          // Set first genre as selected if none selected
+          if (genreList.length > 0 && !selectedGenre) {
+            setSelectedGenre(genreList[0].id || genreList[0]._id);
+          }
+        } else {
+          console.warn('❌ Genres API failed:', response.status);
+          setGenres([]);
+        }
+      } catch (err) {
+        console.error('❌ Error fetching genres:', err);
+        setGenres([]);
+      } finally {
+        setLoadingGenres(false);
+      }
+    };
+
+    fetchGenres();
   }, []);
 
   // Fetch movies for selected category
@@ -54,20 +149,117 @@ export const HomePage = () => {
     fetchCategoryMovies();
   }, [selectedCategory]);
 
-  // Search functionality
+  // Fetch movies for selected genre from API
+  useEffect(() => {
+    if (!selectedGenre) return;
+    
+    const fetchGenreMovies = async () => {
+      // Check if already fetched to prevent duplicate requests
+      if (genreMovies[selectedGenre]) return;
+
+      setLoadingGenreMovies(prev => ({ ...prev, [selectedGenre]: true }));
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const genreId = encodeURIComponent(selectedGenre);
+        const response = await fetch(`${API_BASE_URL}/api/genres/${genreId}/movies?page=1&limit=10`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Genre movies from API:', data);
+          
+          // Handle different response formats
+          const movies = Array.isArray(data) ? data : (data.movies || data.items || data.data || []);
+          
+          // Normalize movies
+          const normalizedMovies = movies.map(movie => ({
+            id: movie._id || movie.id,
+            title: movie.name || movie.title,
+            origin_name: movie.origin_name,
+            poster: movie.poster_url || movie.thumb_url || movie.poster,
+            rating: movie.rating || 0,
+            year: movie.year,
+            duration: movie.time || movie.duration,
+            description: movie.content || movie.description,
+            slug: movie.slug,
+          })).filter(Boolean);
+          
+          setGenreMovies(prev => ({ ...prev, [selectedGenre]: normalizedMovies }));
+        } else {
+          console.warn('❌ Genre movies API failed:', response.status);
+          setGenreMovies(prev => ({ ...prev, [selectedGenre]: [] }));
+        }
+      } catch (err) {
+        console.error('❌ Error fetching genre movies:', err);
+        setGenreMovies(prev => ({ ...prev, [selectedGenre]: [] }));
+      } finally {
+        setLoadingGenreMovies(prev => ({ ...prev, [selectedGenre]: false }));
+      }
+    };
+
+    fetchGenreMovies();
+  }, [selectedGenre]);
+
+  // Search functionality - use API
   useEffect(() => {
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const results = state.movies.filter(movie => {
-        const matchTitle = movie.title?.toLowerCase().includes(query) ||
-                          movie.origin_name?.toLowerCase().includes(query);
-        const matchDescription = movie.description?.toLowerCase().includes(query);
-        const matchActor = movie.actor?.some(actor => actor.toLowerCase().includes(query));
-        const matchDirector = movie.director?.some(dir => dir.toLowerCase().includes(query));
-
-        return matchTitle || matchDescription || matchActor || matchDirector;
-      });
-      setSearchResults(results);
+      const fetchSearchResults = async () => {
+        setSearchLoading(true);
+        try {
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const keyword = encodeURIComponent(searchQuery);
+          const response = await fetch(`${API_BASE_URL}/api/search?keyword=${keyword}&page=1&limit=20`);
+          
+          console.log('Search API response status:', response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Search results from API:', data);
+            
+            // Handle different response formats
+            const results = Array.isArray(data) ? data : (data.items || data.results || []);
+            
+            // Normalize results to match UI expectations
+            const normalizedResults = results.map(movie => ({
+              id: movie._id || movie.id,
+              title: movie.name || movie.title,
+              poster: movie.poster_url || movie.thumb_url || movie.poster,
+              rating: movie.rating || 0,
+              year: movie.year,
+              duration: movie.time || movie.duration,
+              description: movie.content || movie.description,
+              slug: movie.slug,
+            })).filter(Boolean);
+            
+            setSearchResults(normalizedResults);
+          } else {
+            console.warn('❌ Search API failed:', response.status);
+            // Fallback to local search
+            const query = searchQuery.toLowerCase();
+            const results = state.movies.filter(movie => {
+              const matchTitle = movie.title?.toLowerCase().includes(query) ||
+                                movie.origin_name?.toLowerCase().includes(query);
+              const matchDescription = movie.description?.toLowerCase().includes(query);
+              return matchTitle || matchDescription;
+            });
+            setSearchResults(results);
+          }
+        } catch (err) {
+          console.error('❌ Error searching:', err);
+          // Fallback to local search
+          const query = searchQuery.toLowerCase();
+          const results = state.movies.filter(movie => {
+            const matchTitle = movie.title?.toLowerCase().includes(query) ||
+                              movie.origin_name?.toLowerCase().includes(query);
+            const matchDescription = movie.description?.toLowerCase().includes(query);
+            return matchTitle || matchDescription;
+          });
+          setSearchResults(results);
+        } finally {
+          setSearchLoading(false);
+        }
+      };
+      
+      fetchSearchResults();
     } else {
       setSearchResults([]);
     }
@@ -78,22 +270,81 @@ export const HomePage = () => {
     navigate(`/movie/${movieId}`);
   };
 
-  const handleAddToList = (e, movieId) => {
+  const handleAddToList = async (e, movieId) => {
     e.stopPropagation();
     if (!currentUser) {
       navigate('/auth');
       return;
     }
+
     try {
+      // Get movie slug - need to find from featuredMovie
+      const movie = topMovies.find(m => m.id === movieId) || featuredMovie;
+      const movieSlug = movie?.slug;
+      
+      if (!movieSlug) {
+        console.error('❌ Movie slug not found:', movieId);
+        showToast('❌ Lỗi: Không thể lấy thông tin phim', 'error');
+        return;
+      }
+
+      // Call API to add to favorites
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      console.log('📤 Adding to favorites - Movie slug:', movieSlug);
+      
+      const response = await fetch(`${API_BASE_URL}/api/auth/favorites/${movieSlug}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Lỗi: Không thể thêm vào danh sách yêu thích';
+        try {
+          const error = await response.json();
+          console.warn('❌ Failed to add to favorites:', error);
+          // Get error message from API response
+          errorMessage = error.message || error.error || error.msg || errorMessage;
+        } catch {
+          errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+        }
+        showToast(`❌ ${errorMessage}`, 'error');
+      } else {
+        console.log('✅ Added to favorites');
+        // Update favorite state
+        setFavoriteStates(prev => ({ ...prev, [movieId]: true }));
+        showToast('❤️ Đã thêm vào danh sách yêu thích', 'success');
+      }
+
+      // Also update local state
       toggleFavorite(movieId);
     } catch (error) {
-      console.error(error);
+      console.error('❌ Error adding to favorites:', error);
+      showToast('❌ Lỗi: ' + (error.message || 'Không thể kết nối đến server'), 'error');
     }
   };
 
   const handleLogout = () => {
     logout();
     navigate('/auth');
+  };
+
+  const handleNextMovie = () => {
+    if (topMovies.length > 0) {
+      const nextIndex = (currentMovieIndex + 1) % topMovies.length;
+      setCurrentMovieIndex(nextIndex);
+      setFeaturedMovie(topMovies[nextIndex]);
+    }
+  };
+
+  const handlePrevMovie = () => {
+    if (topMovies.length > 0) {
+      const prevIndex = (currentMovieIndex - 1 + topMovies.length) % topMovies.length;
+      setCurrentMovieIndex(prevIndex);
+      setFeaturedMovie(topMovies[prevIndex]);
+    }
   };
 
   const categories = [
@@ -105,76 +356,35 @@ export const HomePage = () => {
     { id: 'phim-thuyet-minh', name: 'Phim Thuyết Minh' },
   ];
 
-  const displayMovies = categoryMovies[selectedCategory] || state.movies.slice(0, 10);
+  // Display genre movies if genre selected, otherwise category movies
+  const displayMovies = selectedGenre && genreMovies[selectedGenre] 
+    ? genreMovies[selectedGenre] 
+    : (categoryMovies[selectedCategory] || state.movies.slice(0, 10));
+  
   const isLoadingCategory = loadingCategories[selectedCategory] === true;
+  const isLoadingGenre = selectedGenre && loadingGenreMovies[selectedGenre] === true;
+  const isLoading = selectedGenre ? isLoadingGenre : isLoadingCategory;
 
   return (
-    <div className="netflix-home">
+    <div className="MOIVE-home">
+      {/* Toast Notifications */}
+      {toasts.map((toast) => (
+        <Toast
+          key={toast.id}
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => removeToast(toast.id)}
+        />
+      ))}
+
       {/* Header */}
-      <header className={`netflix-header ${scrolled ? 'scrolled' : ''}`}>
-        <div className="header-left">
-          <div className="netflix-logo" onClick={() => navigate('/')}>NETFLIX</div>
-          <nav className="header-nav">
-            <button onClick={() => navigate('/')} className="nav-link active">Home</button>
-            <button onClick={() => navigate('/')} className="nav-link">TV Shows</button>
-            <button onClick={() => navigate('/')} className="nav-link">Movies</button>
-            <button onClick={() => navigate('/')} className="nav-link">Recently Added</button>
-            <button onClick={() => navigate(currentUser ? '/my-favorites' : '/auth')} className="nav-link">My List</button>
-          </nav>
-        </div>
-        <div className="header-right">
-          <button className="icon-btn search-btn" title="Search" onClick={() => setShowSearch(true)}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-          {currentUser && (
-            <button className="icon-btn notification-btn" title="Notifications">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M15 17H20L18.595 15.595C18.4063 15.4063 18.3 15.1513 18.3 14.885V11C18.3 8.61305 16.7305 6.57 14.55 5.795C14.2672 4.77154 13.3873 4 12.3 4C11.2127 4 10.3328 4.77154 10.05 5.795C7.86954 6.57 6.3 8.61305 6.3 11V14.885C6.3 15.1513 6.19373 15.4063 6.005 15.595L4.6 17H9.3M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-          <div className="user-menu">
-            <div className="user-profile">
-              <img src="https://i.pravatar.cc/40" alt="User" />
-            </div>
-            <div className="user-dropdown">
-              {currentUser ? (
-                <>
-                  <button onClick={() => navigate('/profile')} className="dropdown-item">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Profile
-                  </button>
-                  {currentUser.role === 'admin' && (
-                    <button onClick={() => navigate('/admin/movies')} className="dropdown-item">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Admin Panel
-                    </button>
-                  )}
-                  <button onClick={handleLogout} className="dropdown-item">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => navigate('/auth')} className="dropdown-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Sign In
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header 
+        scrolled={scrolled}
+        showSearch={true}
+        onSearchClick={() => setShowSearch(true)}
+        isHomePage={true}
+      />
 
       {/* Hero Section */}
       {featuredMovie && (
@@ -201,91 +411,360 @@ export const HomePage = () => {
                 </svg>
                 WATCH
               </button>
-              <button className="btn-add" onClick={(e) => handleAddToList(e, featuredMovie.id)}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <button 
+                className="btn-add" 
+                onClick={(e) => handleAddToList(e, featuredMovie.id)}
+                style={{
+                  stroke: favoriteStates[featuredMovie.id] ? '#e50914' : 'currentColor',
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill={favoriteStates[featuredMovie.id] ? '#e50914' : 'none'} stroke={favoriteStates[featuredMovie.id] ? '#e50914' : 'currentColor'}>
                   <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-                ADD TO LIST
+                
               </button>
             </div>
           </div>
+          
+          {/* Slider Controls */}
+          {topMovies.length > 1 && (
+            <div className="hero-slider-controls">
+              <button 
+                className="slider-btn slider-prev"
+                onClick={handlePrevMovie}
+                title="Previous movie"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <div className="slider-indicators">
+                {topMovies.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`indicator-dot ${index === currentMovieIndex ? 'active' : ''}`}
+                    onClick={() => {
+                      setCurrentMovieIndex(index);
+                      setFeaturedMovie(topMovies[index]);
+                    }}
+                    title={`Movie ${index + 1}`}
+                  />
+                ))}
+              </div>
+              <button 
+                className="slider-btn slider-next"
+                onClick={handleNextMovie}
+                title="Next movie"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          )}
         </section>
       )}
 
-      {/* Categories */}
-      <div className="categories-section">
-        <div className="category-tabs">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat.id)}
-            >
-              {cat.name}
-            </button>
-          ))}
+      {/* Categories Section with Unified Design */}
+      <div style={{
+        background: '#141414',
+        padding: '40px 50px 20px',
+        borderBottom: '1px solid #2a2a2a',
+      }}>
+        
+      </div>
+
+      {/* Genre Pills Section */}
+      <div style={{
+        background: '#141414',
+        padding: '20px 50px',
+        borderBottom: '1px solid #2a2a2a',
+      }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+          <p style={{
+            fontSize: '12px',
+            color: '#b3b3b3',
+            margin: '0 0 12px 0',
+            fontWeight: '600',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}>
+            🎬 Thể Loại
+          </p>
+          
+          <div className="genre-pills" style={{
+            display: 'flex',
+            gap: '10px',
+            flexWrap: 'wrap',
+            margin: 0,
+            padding: 0,
+          }}>
+            {loadingGenres ? (
+              <span style={{ color: '#b3b3b3', fontSize: '14px' }}>⏳ Đang tải...</span>
+            ) : genres.length > 0 ? (
+              genres.slice(0, 12).map(genre => (
+                <button 
+                  key={genre.id || genre._id} 
+                  onClick={() => setSelectedGenre(genre.id || genre._id)}
+                  style={{
+                    background: selectedGenre === (genre.id || genre._id) ? '#e50914' : '#2a2a2a',
+                    border: selectedGenre === (genre.id || genre._id) ? '2px solid #e50914' : '2px solid #404040',
+                    color: '#fff',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedGenre !== (genre.id || genre._id)) {
+                      e.target.style.background = '#333';
+                      e.target.style.borderColor = '#555';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedGenre !== (genre.id || genre._id)) {
+                      e.target.style.background = '#2a2a2a';
+                      e.target.style.borderColor = '#404040';
+                    }
+                  }}
+                >
+                  {genre.name}
+                </button>
+              ))
+            ) : (
+              <span style={{ color: '#b3b3b3', fontSize: '14px' }}>Không có thể loại</span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Genre Pills */}
-      <div className="genre-pills">
-        {state.genres.slice(0, 8).map(genre => (
-          <button key={genre.id} className="genre-pill">
-            {genre.name}
-          </button>
-        ))}
-      </div>
-
       {/* Movie Grid */}
-      <div className="movies-section">
-        <h2 className="section-title">{categories.find(c => c.id === selectedCategory)?.name}</h2>
-        <div className="movies-grid-container">
-          {isLoadingCategory ? (
-            <div className="loading-spinner">Đang tải...</div>
+      <div style={{
+        background: '#141414',
+        padding: '40px 50px',
+        minHeight: '400px',
+      }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '28px',
+          }}>
+            <span style={{ fontSize: '24px' }}>
+              {selectedGenre ? '🎬' : '📺'}
+            </span>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              margin: 0,
+              color: '#e5e5e5',
+            }}>
+              {selectedGenre && genres.length > 0
+                ? genres.find(g => (g.id || g._id) === selectedGenre)?.name || 'Thể loại'
+                : categories.find(c => c.id === selectedCategory)?.name}
+            </h2>
+            {isLoading && (
+              <span style={{
+                fontSize: '14px',
+                color: '#b3b3b3',
+                marginLeft: 'auto',
+              }}>
+                ⏳ Đang tải...
+              </span>
+            )}
+          </div>
+
+          {!isLoading && displayMovies.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#b3b3b3',
+            }}>
+              <p style={{ fontSize: '18px', margin: '0 0 12px 0' }}>😢 Không có phim nào</p>
+              <p style={{ fontSize: '14px', margin: 0, opacity: 0.7 }}>Thử chọn danh mục hoặc thể loại khác</p>
+            </div>
           ) : (
-            <div className="movies-grid">
-              {displayMovies.length > 0 ? displayMovies.map(movie => (
+            <div className="movies-grid" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: '20px',
+              padding: 0,
+            }}>
+              {displayMovies.map(movie => (
                 <div
                   key={movie.id}
                   className="movie-card"
                   onClick={() => handleMovieClick(movie.id)}
+                  style={{
+                    background: '#000',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #333',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(229, 9, 20, 0.3)';
+                    e.currentTarget.style.borderColor = '#e50914';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.borderColor = '#333';
+                  }}
                 >
-                  <img src={movie.poster} alt={movie.title} />
-                  <div className="movie-info">
-                    <h3>{movie.title}</h3>
-                    <div className="movie-meta">
-                      <span className="movie-rating">★ {(movie.rating || 0).toFixed(1)}</span>
-                      <span>{movie.year}</span>
+                  <img 
+                    src={movie.poster} 
+                    alt={movie.title}
+                    style={{
+                      width: '100%',
+                      height: '70%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                  <div className="movie-info" style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#000',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}>
+                    <h3 style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      margin: 0,
+                      color: '#fff',
+                      lineHeight: 1.3,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}>{movie.title}</h3>
+                    <div style={{
+                      display: 'flex',
+                      gap: '10px',
+                      fontSize: '12px',
+                      color: '#fff',
+                      marginTop: '8px',
+                      alignItems: 'center',
+                    }}>
+                      <span style={{ color: '#fbbf24', fontWeight: '600' }}>★ {(movie.rating || 0).toFixed(1)}</span>
+                      <span style={{ color: '#999' }}>|</span>
+                      <span style={{ color: '#999' }}>{movie.year}</span>
                     </div>
                   </div>
                 </div>
-              )) : (
-                <div className="empty-state">
-                  <p>Không có phim nào</p>
-                </div>
-              )}
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* All Movies Section */}
-      <div className="movies-section">
-        <h2 className="section-title">Phim Phổ Biến</h2>
-        <div className="movies-grid-container">
-          <div className="movies-grid">
+      {/* Popular Movies Section */}
+      <div style={{
+        background: '#0a0a0a',
+        padding: '40px 50px',
+        borderTop: '1px solid #2a2a2a',
+      }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '28px',
+          }}>
+            <span style={{ fontSize: '24px' }}>⭐</span>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              margin: 0,
+              color: '#e5e5e5',
+            }}>
+              Phim Phổ Biến
+            </h2>
+          </div>
+
+          <div className="movies-grid" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '20px',
+            padding: 0,
+          }}>
             {state.movies.slice(0, 12).map(movie => (
               <div
                 key={movie.id}
                 className="movie-card"
                 onClick={() => handleMovieClick(movie.id)}
+                style={{
+                  background: '#000',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  border: '1px solid #333',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(229, 9, 20, 0.3)';
+                  e.currentTarget.style.borderColor = '#e50914';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.borderColor = '#333';
+                }}
               >
-                <img src={movie.poster} alt={movie.title} />
-                <div className="movie-info">
-                  <h3>{movie.title}</h3>
-                  <div className="movie-meta">
-                    <span className="movie-rating">★ {(movie.rating || 0).toFixed(1)}</span>
-                    <span>{movie.year}</span>
+                <img 
+                  src={movie.poster} 
+                  alt={movie.title}
+                  style={{
+                    width: '100%',
+                    height: '70%',
+                    objectFit: 'cover',
+                  }}
+                />
+                <div className="movie-info" style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#000',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}>
+                  <h3 style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    margin: 0,
+                    color: '#fff',
+                    lineHeight: 1.3,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}>{movie.title}</h3>
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    fontSize: '12px',
+                    color: '#fff',
+                    marginTop: '8px',
+                    alignItems: 'center',
+                  }}>
+                    <span style={{ color: '#fbbf24', fontWeight: '600' }}>★ {(movie.rating || 0).toFixed(1)}</span>
+                    <span style={{ color: '#999' }}>|</span>
+                    <span style={{ color: '#999' }}>{movie.year}</span>
                   </div>
                 </div>
               </div>
@@ -295,7 +774,7 @@ export const HomePage = () => {
       </div>
 
       {/* Footer */}
-      <footer className="netflix-footer">
+      <footer className="MOIVE-footer">
         <div className="footer-content">
           <div className="footer-links">
             <a href="#about">About</a>
@@ -304,7 +783,6 @@ export const HomePage = () => {
             <a href="#privacy">Privacy</a>
             <a href="#contact">Contact Us</a>
           </div>
-          <p className="footer-copyright">© 2025 Netflix Clone. Built with React.</p>
         </div>
       </footer>
 
@@ -313,26 +791,7 @@ export const HomePage = () => {
         <div className="search-modal-overlay" onClick={() => setShowSearch(false)}>
           <div className="search-modal" onClick={(e) => e.stopPropagation()}>
             <div className="search-modal-header">
-              <div className="search-input-wrapper">
-                <svg className="search-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm phim, đạo diễn, diễn viên..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  autoFocus
-                  className="search-modal-input"
-                />
-                {searchQuery && (
-                  <button className="clear-search" onClick={() => setSearchQuery('')}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M18 6L6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                )}
-              </div>
+              <h2 style={{ margin: 0, fontSize: '20px', color: '#fff' }}>🔍 Tìm kiếm phim</h2>
               <button className="close-search" onClick={() => setShowSearch(false)}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path d="M18 6L6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round"/>
@@ -340,54 +799,22 @@ export const HomePage = () => {
               </button>
             </div>
 
-            <div className="search-modal-content">
-              {searchQuery.trim() === '' ? (
-                <div className="search-placeholder">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <p>Nhập từ khóa để tìm kiếm</p>
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="search-results">
-                  <div className="search-results-header">
-                    <h3>Kết quả tìm kiếm</h3>
-                    <span className="results-count">{searchResults.length} phim</span>
-                  </div>
-                  <div className="search-results-grid">
-                    {searchResults.map(movie => (
-                      <div
-                        key={movie.id}
-                        className="search-result-item"
-                        onClick={() => {
-                          handleMovieClick(movie.id);
-                          setShowSearch(false);
-                          setSearchQuery('');
-                        }}
-                      >
-                        <img src={movie.poster} alt={movie.title} />
-                        <div className="search-result-info">
-                          <h4>{movie.title}</h4>
-                          <div className="search-result-meta">
-                            <span className="result-rating">★ {(movie.rating || 0).toFixed(1)}</span>
-                            <span>{movie.year}</span>
-                            <span>{movie.duration || 'N/A'}</span>
-                          </div>
-                          <p className="result-description">{(movie.description || '').substring(0, 100)}...</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="search-no-results">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M9.172 9.172a4 4 0 015.656 0M21 21l-4.35-4.35m2.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <h3>Không tìm thấy kết quả</h3>
-                  <p>Không có phim nào phù hợp với từ khóa "{searchQuery}"</p>
-                </div>
-              )}
+            <div className="search-modal-content" style={{ padding: '24px' }}>
+              <SearchBar
+                query={searchQuery}
+                onChange={setSearchQuery}
+                onSearch={setSearchQuery}
+                results={searchResults}
+                isLoading={searchLoading}
+                showResults={true}
+                description="Nhập tên phim, đạo diễn hoặc diễn viên để tìm kiếm"
+                variant="dark"
+                onResultClick={(movie) => {
+                  handleMovieClick(movie.slug || movie.id);
+                  setShowSearch(false);
+                  setSearchQuery('');
+                }}
+              />
             </div>
           </div>
         </div>

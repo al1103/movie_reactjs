@@ -18,7 +18,6 @@ const defaultState = {
   actors: [],
   users: [],
   currentUserId: null,
-  commentThrottle: {},
   ratingThrottle: {},
 };
 
@@ -40,7 +39,6 @@ const normalizeMovie = (movie) => {
   return {
     ...movie,
     ratings,
-    comments: movie.comments || [],
     rating: ratingValue,
     views: movie.views || 0,
   };
@@ -185,7 +183,6 @@ export const AppDataProvider = ({ children }) => {
             password, // Store password locally for fallback
             role: user.role || 'user',
             favorites: user.favorites || [],
-            history: user.history || [],
           };
           withPersist(
             (prev) => ({
@@ -297,7 +294,6 @@ export const AppDataProvider = ({ children }) => {
           password, // Store password locally for fallback
           role: user.role || 'user',
           favorites: user.favorites || [],
-          history: user.history || [],
         };
 
         withPersist(
@@ -393,17 +389,9 @@ export const AppDataProvider = ({ children }) => {
         }),
         setState
       );
-
-      if (currentUser) {
-        updateUser(currentUser.id, (user) => {
-          const historyItem = { movieId, viewedAt: Date.now() };
-          const updated = [historyItem, ...(user.history || [])];
-          return { history: updated.slice(0, 50) };
-        });
-      }
     };
 
-    const addRating = (movieId, score, comment) => {
+    const addRating = (movieId, score) => {
       if (!currentUser) throw new Error('Cần đăng nhập');
       const now = Date.now();
       const lastRating = state.ratingThrottle[currentUser.id] || 0;
@@ -422,7 +410,6 @@ export const AppDataProvider = ({ children }) => {
             const ratingItem = {
               userId: currentUser.id,
               score,
-              comment: comment || '',
               createdAt: now,
             };
             if (existingRatingIndex >= 0) {
@@ -448,78 +435,6 @@ export const AppDataProvider = ({ children }) => {
             },
           };
         },
-        setState
-      );
-    };
-
-    const addComment = (movieId, text) => {
-      if (!currentUser) throw new Error('Cần đăng nhập');
-      const now = Date.now();
-      const lastComment = state.commentThrottle[currentUser.id] || 0;
-      if (now - lastComment < 30 * 1000) {
-        throw new Error('Bạn đang bình luận quá nhanh, vui lòng thử lại sau');
-      }
-      if (!text.trim()) throw new Error('Nội dung bình luận không hợp lệ');
-
-      withPersist(
-        (prev) => ({
-          ...prev,
-          movies: prev.movies.map((movie) => {
-            if (movie.id !== movieId) return movie;
-            const commentItem = {
-              id: `${movieId}-${currentUser.id}-${now}`,
-              userId: currentUser.id,
-              userName: currentUser.name,
-              text,
-              createdAt: now,
-              hidden: false,
-            };
-            return {
-              ...movie,
-              comments: [commentItem, ...movie.comments].slice(0, 100),
-            };
-          }),
-          commentThrottle: {
-            ...prev.commentThrottle,
-            [currentUser.id]: now,
-          },
-        }),
-        setState
-      );
-    };
-
-    const setCommentVisibility = (movieId, commentId, hidden) => {
-      withPersist(
-        (prev) => ({
-          ...prev,
-          movies: prev.movies.map((movie) =>
-            movie.id === movieId
-              ? {
-                  ...movie,
-                  comments: movie.comments.map((comment) =>
-                    comment.id === commentId ? { ...comment, hidden } : comment
-                  ),
-                }
-              : movie
-          ),
-        }),
-        setState
-      );
-    };
-
-    const deleteComment = (movieId, commentId) => {
-      withPersist(
-        (prev) => ({
-          ...prev,
-          movies: prev.movies.map((movie) =>
-            movie.id === movieId
-              ? {
-                  ...movie,
-                  comments: movie.comments.filter((comment) => comment.id !== commentId),
-                }
-              : movie
-          ),
-        }),
         setState
       );
     };
@@ -586,7 +501,6 @@ export const AppDataProvider = ({ children }) => {
           users: prev.users.map((user) => ({
             ...user,
             favorites: user.favorites.filter((id) => id !== movieId),
-            history: (user.history || []).filter((item) => item.movieId !== movieId),
           })),
         }),
         setState
@@ -615,7 +529,7 @@ export const AppDataProvider = ({ children }) => {
           genres: prev.genres.filter((item) => item.id !== genreId),
           movies: prev.movies.map((movie) => ({
             ...movie,
-            genres: movie.genres.filter((id) => id !== genreId),
+            genres: movie.genres ? movie.genres.filter((id) => id !== genreId) : [],
           })),
         }),
         setState
@@ -644,7 +558,7 @@ export const AppDataProvider = ({ children }) => {
           actors: prev.actors.filter((item) => item.id !== actorId),
           movies: prev.movies.map((movie) => ({
             ...movie,
-            cast: movie.cast.filter((id) => id !== actorId),
+            cast: movie.cast ? movie.cast.filter((id) => id !== actorId) : [],
           })),
         }),
         setState
@@ -660,15 +574,11 @@ export const AppDataProvider = ({ children }) => {
         (prev) => ({
           ...prev,
           users: prev.users.filter((user) => user.id !== userId),
-          commentThrottle: Object.fromEntries(
-            Object.entries(prev.commentThrottle).filter(([key]) => key !== userId)
-          ),
           ratingThrottle: Object.fromEntries(
             Object.entries(prev.ratingThrottle).filter(([key]) => key !== userId)
           ),
           movies: prev.movies.map((movie) => ({
             ...movie,
-            comments: movie.comments.filter((comment) => comment.userId !== userId),
             ratings: movie.ratings.filter((rating) => rating.userId !== userId),
           })),
           currentUserId: prev.currentUserId === userId ? null : prev.currentUserId,
@@ -696,8 +606,6 @@ export const AppDataProvider = ({ children }) => {
       deleteActor,
       updateUserRole,
       deleteUser,
-      setCommentVisibility,
-      deleteComment,
     };
 
     return {
@@ -712,9 +620,7 @@ export const AppDataProvider = ({ children }) => {
       toggleFavorite,
       recordView,
       addRating,
-      addComment,
       adminActions,
-      stats,
     };
   }, [state, setState, loading, error]);
 

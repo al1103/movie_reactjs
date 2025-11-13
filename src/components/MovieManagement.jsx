@@ -25,12 +25,14 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('form'); // 'form' or 'list'
+  const [viewMode, setViewMode] = useState('list'); // 'form' or 'list'
   const [uploading, setUploading] = useState(false);
   const [posterPreview, setPosterPreview] = useState('');
   const [bannerPreview, setBannerPreview] = useState('');
   const [trailerUrl, setTrailerUrl] = useState('');
   const [genres, setGenres] = useState(genresProp || []);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   const { toasts, show: showToast, remove: removeToast } = useToast();
 
   // ========== Generate Slug from Title ==========
@@ -76,7 +78,6 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
       slug: movie.slug || generateSlug(movie.title || ''),
       rating: movie.rating || 0,
       ratings: Array.isArray(movie.ratings) ? movie.ratings : [],
-      comments: Array.isArray(movie.comments) ? movie.comments : [],
       views: movie.views || 0,
     };
   };
@@ -144,6 +145,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
           return;
         }
 
+        
         const data = await response.json();
         // API returns { movie: {...} } or { data: {...} }
         const movieData = data.movie || data.data || data;
@@ -157,9 +159,11 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
           id: movieData._id || movieData.id,
           title: movieData.name || movieData.title,
           genres: movieData.category || movieData.genres || [],
-        };
-        
-        const normalizedMovie = normalizeMovieForm(mappedMovieData);
+          poster: movieData.poster || movieData.poster_url,
+          banner: movieData.banner || movieData.poster_url,
+          description: movieData.description || movieData.content || '',
+          cast: movieData.cast || movieData.actor || [],
+        };        const normalizedMovie = normalizeMovieForm(mappedMovieData);
         console.log('Normalized movie:', normalizedMovie);
         
         setMovieForm({
@@ -192,6 +196,67 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
     }
     // API fetch happens in useEffect when selectedMovieId changes
   };
+
+  // ========== Search movies from API ==========
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchMovies = async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/search?keyword=${encodeURIComponent(searchQuery)}&page=1&limit=20`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          console.warn('Search failed:', response.statusText);
+          setSearchResults([]);
+          return;
+        }
+
+        const data = await response.json();
+        // API returns { items: [...] } or { data: [...] }
+        const results = data.items || data.data || [];
+        
+        // Normalize the results to match movie structure
+        const normalizedResults = results.map(movie => ({
+          id: movie._id || movie.id,
+          _id: movie._id,
+          title: movie.name || movie.title,
+          slug: movie.slug,
+          poster: movie.poster || movie.poster_url,
+          banner: movie.banner || movie.poster_url,
+          rating: movie.rating || 0,
+          year: movie.year,
+          duration: movie.duration,
+          views: movie.views || 0,
+          ratings: movie.ratings || [],
+        }));
+        
+        setSearchResults(normalizedResults);
+        console.log('Search results:', normalizedResults);
+      } catch (err) {
+        console.error('Search error:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      searchMovies();
+    }, 500); // Debounce search by 500ms
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
 
   // ========== Upload Image Handler ==========
   const handleImageUpload = async (file, type) => {
@@ -376,24 +441,12 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         year: Number(movieForm.year),
         duration: Number(movieForm.duration),
         ratings: movieForm.ratings || [],
-        comments: movieForm.comments || [],
         views: movieForm.views || 0,
       };
 
       const isNewMovie = !selectedMovieId;
       
-      // Get the correct slug to use for API calls
-      let movieSlug;
-      if (isNewMovie) {
-        // For new movie, use the generated slug from form
-        movieSlug = payload.slug;
-      } else {
-        // For existing movie, prioritize slug from current form data, then from movie object
-        const selectedMovie = movies.find(m => m.id === selectedMovieId);
-        movieSlug = payload.slug || selectedMovie?.slug || selectedMovieId;
-      }
-      
-      console.log('DEBUG: isNewMovie =', isNewMovie, 'movieSlug =', movieSlug, 'selectedMovieId =', selectedMovieId);
+      console.log('DEBUG: isNewMovie =', isNewMovie, 'selectedMovieId =', selectedMovieId);
       
       if (isNewMovie) {
         // ========== CREATE NEW MOVIE via POST /api/movies/upload ==========
@@ -431,19 +484,19 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         const data = await response.json();
         console.log('API response:', data);
         
-        // Handle different API response formats
-        movieSlug = data.data?.slug || data.data?.id || data.slug || data.id;
+        // Handle different API response formats - API returns the movie _id from MongoDB
+        const newMovieId = data.data?._id || data._id || data.data?.id || data.id;
         
-        if (!movieSlug) {
-          throw new Error('Backend did not return movie slug or id');
+        if (!newMovieId) {
+          throw new Error('Backend did not return movie _id');
         }
         
-        console.log('Got movieSlug:', movieSlug);
+        console.log('Got new movie _id:', newMovieId);
         
         // Parse episodes từ textarea
         const episodes = parseEpisodes(movieForm.episodes);
         
-        // ========== CREATE EPISODES via POST /api/movies/:slug/episodes ==========
+        // ========== CREATE EPISODES via POST /api/movies/:id/episodes ==========
         if (episodes.length > 0) {
           for (const episode of episodes) {
             const episodePayload = {
@@ -456,7 +509,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
               language: 'Vietsub',
             };
 
-            const episodeResponse = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}/episodes`, {
+            const episodeResponse = await fetch(`${API_BASE_URL}/api/movies/${newMovieId}/episodes`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -472,11 +525,11 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         }
         
         // Add to local state
-        adminActions.upsertMovie({ ...payload, id: movieSlug, slug: movieSlug });
+        adminActions.upsertMovie({ ...payload, id: newMovieId, slug: payload.slug });
         showToast('✅ Đã tạo phim mới, cập nhật episodes và lưu vào database', 'success');
-        setSelectedMovieId(movieSlug);
+        setSelectedMovieId(newMovieId);
       } else {
-        // ========== UPDATE EXISTING MOVIE via PUT /api/movies/:slug ==========
+        // ========== UPDATE EXISTING MOVIE via PUT /api/movies/:id ==========
         const updatePayload = {
           name: payload.title,  // Backend expects 'name', not 'title'
           description: payload.description,
@@ -493,7 +546,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
           quality: payload.quality || '720p',
         };
 
-        const response = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}`, {
+        const response = await fetch(`${API_BASE_URL}/api/movies/${selectedMovieId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -510,7 +563,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         // Parse episodes từ textarea
         const episodes = parseEpisodes(movieForm.episodes);
         
-        // ========== CREATE/UPDATE EPISODES via POST /api/movies/:slug/episodes ==========
+        // ========== CREATE/UPDATE EPISODES via POST /api/movies/:id/episodes ==========
         if (episodes.length > 0) {
           for (const episode of episodes) {
             const episodePayload = {
@@ -523,7 +576,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
               language: 'Vietsub',
             };
 
-            const episodeResponse = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}/episodes`, {
+            const episodeResponse = await fetch(`${API_BASE_URL}/api/movies/${selectedMovieId}/episodes`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -539,7 +592,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         }
 
         // Update local state - use selectedMovieId to find and update the movie
-        adminActions.upsertMovie({ ...payload, id: selectedMovieId, slug: movieSlug });
+        adminActions.upsertMovie({ ...payload, id: selectedMovieId });
         showToast('✅ Đã cập nhật phim, episodes vào database', 'success');
         
         // Refresh movies list from API to get the latest data
@@ -548,7 +601,7 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         }
       }
 
-      console.log('Movie saved successfully with slug:', movieSlug);
+      console.log('Movie saved successfully with _id:', selectedMovieId);
       // Keep selectedMovieId as is for existing movies
       if (isNewMovie) {
         setSelectedMovieId(movieSlug);
@@ -570,12 +623,8 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
 
     setUploading(true);
     try {
-      // Get the actual movie slug from the movie object
-      const movie = movies.find(m => m.id === movieId);
-      const movieSlug = movie?.slug || movieId;
-
-      // ========== DELETE via DELETE /api/movies/:slug ==========
-      const response = await fetch(`${API_BASE_URL}/api/movies/${movieSlug}`, {
+      // ========== DELETE via DELETE /api/movies/:id ==========
+      const response = await fetch(`${API_BASE_URL}/api/movies/${movieId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -601,14 +650,13 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
   };
 
   const filteredMovies = useMemo(() => {
-    if (!searchQuery.trim()) return movies;
-    const query = searchQuery.toLowerCase();
-    return movies.filter(movie =>
-      movie.title.toLowerCase().includes(query) ||
-      movie.director.toLowerCase().includes(query) ||
-      movie.country.toLowerCase().includes(query)
-    );
-  }, [movies, searchQuery]);
+    // If user is searching, use API search results
+    if (searchQuery.trim()) {
+      return searchResults;
+    }
+    // Otherwise use all movies
+    return movies;
+  }, [movies, searchResults, searchQuery]);
 
   return (
     <section className="movie-management-modern">
@@ -717,7 +765,6 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
                     </div>
                     <div className="movie-stats">
                       <span>👁 {movie.views || 0}</span>
-                      <span>💬 {movie.comments?.length || 0}</span>
                       <span>⭐ {movie.ratings?.length || 0}</span>
                     </div>
                   </div>
@@ -761,16 +808,6 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
         <label>
           Tên phim
           <input name="title" value={movieForm.title} onChange={handleMovieFormChange} required />
-        </label>
-        <label>
-          Slug (tự động sinh từ tên phim)
-          <input 
-            name="slug" 
-            value={movieForm.slug || ''} 
-            readOnly
-            style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
-            title="Slug được tự động sinh từ tên phim"
-          />
         </label>
         <label>
           Mô tả
@@ -929,13 +966,13 @@ export const MovieManagement = ({ movies, genres: genresProp, actors, adminActio
           </div>
         </label>
         <label>
-          Danh sách tập (mỗi dòng: Tiêu đề|Số phút)
+          Số phút
           <textarea
             name="episodes"
             rows="4"
             value={movieForm.episodes}
             onChange={handleMovieFormChange}
-            placeholder="Tập 1|45\nTập 2|45"
+            placeholder="45"
           />
         </label>
             <div className="form-actions-admin">

@@ -2,18 +2,16 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute.jsx';
 import { AppDataProvider } from './context/AppDataContext.jsx';
 import { AdminActorsPage } from './pages/AdminActorsPage.jsx';
-import { AdminCommentsPage } from './pages/AdminCommentsPage.jsx';
 import { AdminGenresPage } from './pages/AdminGenresPage.jsx';
 import { AdminMoviesPage } from './pages/AdminMoviesPage.jsx';
 import { AdminPage } from './pages/AdminPage.jsx';
-import { AdminStatsPage } from './pages/AdminStatsPage.jsx';
 import { AdminUsersPage } from './pages/AdminUsersPage.jsx';
 import { AuthPage } from './pages/AuthPage.jsx';
 import { FavoritesPage } from './pages/FavoritesPage.jsx';
 import { HomePage } from './pages/HomePage.jsx';
 import { MovieDetailPage } from './pages/MovieDetailPage.jsx';
 import { UserFavoritesPage } from './pages/UserFavoritesPage.jsx';
-import { UserHistoryPage } from './pages/UserHistoryPage.jsx';
+
 import { UserProfilePage } from './pages/UserProfilePage.jsx';
 
 const AppRoutes = () => {
@@ -67,22 +65,6 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admin/comments"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminCommentsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/stats"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <AdminStatsPage />
-            </ProtectedRoute>
-          }
-        />
 
         {/* User Routes - No Layout (has own header) */}
         <Route
@@ -90,14 +72,6 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <UserProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/my-history"
-          element={
-            <ProtectedRoute>
-              <UserHistoryPage />
             </ProtectedRoute>
           }
         />

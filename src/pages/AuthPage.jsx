@@ -56,17 +56,17 @@ export const AuthPage = () => {
 
   return (
     <AuthLayout>
-      <div className="auth-box-netflix">
-        <div className="auth-form-wrapper-netflix">
-          <h1 className="auth-title-netflix">
+      <div className="auth-box-MOIVE">
+        <div className="auth-form-wrapper-MOIVE">
+          <h1 className="auth-title-MOIVE">
             {mode === modes.LOGIN && 'Đăng nhập'}
             {mode === modes.REGISTER && 'Đăng ký'}
             {mode === modes.RESET && 'Đặt lại mật khẩu'}
           </h1>
 
-          <form onSubmit={handleSubmit} className="auth-form-netflix">
+          <form onSubmit={handleSubmit} className="auth-form-MOIVE">
             {mode === modes.REGISTER && (
-              <div className="form-group-netflix">
+              <div className="form-group-MOIVE">
                 <input
                   id="name"
                   name="name"
@@ -75,13 +75,13 @@ export const AuthPage = () => {
                   onChange={handleChange}
                   placeholder="Họ tên"
                   disabled={loading}
-                  className="input-netflix"
+                  className="input-MOIVE"
                   required
                 />
               </div>
             )}
 
-            <div className="form-group-netflix">
+            <div className="form-group-MOIVE">
               <input
                 id="email"
                 name="email"
@@ -90,13 +90,13 @@ export const AuthPage = () => {
                 onChange={handleChange}
                 placeholder="Email hoặc số điện thoại"
                 disabled={loading}
-                className="input-netflix"
+                className="input-MOIVE"
                 required
               />
             </div>
 
             {mode !== modes.RESET && (
-              <div className="form-group-netflix password-group">
+              <div className="form-group-MOIVE password-group">
                 <input
                   id="password"
                   name="password"
@@ -105,12 +105,12 @@ export const AuthPage = () => {
                   onChange={handleChange}
                   placeholder="Mật khẩu"
                   disabled={loading}
-                  className="input-netflix"
+                  className="input-MOIVE"
                   required
                 />
                 <button
                   type="button"
-                  className="toggle-password-netflix"
+                  className="toggle-password-MOIVE"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? 'Ẩn' : 'Hiện'}
@@ -119,7 +119,7 @@ export const AuthPage = () => {
             )}
 
             {mode === modes.RESET && (
-              <div className="form-group-netflix password-group">
+              <div className="form-group-MOIVE password-group">
                 <input
                   id="newPassword"
                   name="newPassword"
@@ -128,12 +128,12 @@ export const AuthPage = () => {
                   onChange={handleChange}
                   placeholder="Mật khẩu mới"
                   disabled={loading}
-                  className="input-netflix"
+                  className="input-MOIVE"
                   required
                 />
                 <button
                   type="button"
-                  className="toggle-password-netflix"
+                  className="toggle-password-MOIVE"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? 'Ẩn' : 'Hiện'}
@@ -142,7 +142,7 @@ export const AuthPage = () => {
             )}
 
             {error && (
-              <div className="alert-netflix error-netflix">
+              <div className="alert-MOIVE error-MOIVE">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <circle cx="12" cy="12" r="10" strokeWidth="2"/>
                   <path d="M15 9l-6 6M9 9l6 6" strokeWidth="2" strokeLinecap="round"/>
@@ -151,7 +151,7 @@ export const AuthPage = () => {
               </div>
             )}
             {message && (
-              <div className="alert-netflix success-netflix">
+              <div className="alert-MOIVE success-MOIVE">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeWidth="2" strokeLinecap="round"/>
                   <polyline points="22 4 12 14.01 9 11.01" strokeWidth="2" strokeLinecap="round"/>
@@ -162,11 +162,11 @@ export const AuthPage = () => {
 
             <button
               type="submit"
-              className="btn-submit-netflix"
+              className="btn-submit-MOIVE"
               disabled={loading}
             >
               {loading ? (
-                <div className="loading-spinner-netflix"></div>
+                <div className="loading-spinner-MOIVE"></div>
               ) : mode === modes.LOGIN ? (
                 'Đăng nhập'
               ) : mode === modes.REGISTER ? (
@@ -177,14 +177,14 @@ export const AuthPage = () => {
             </button>
 
             {mode === modes.LOGIN && (
-              <div className="form-extras-netflix">
-                <label className="remember-me-netflix">
+              <div className="form-extras-MOIVE">
+                <label className="remember-me-MOIVE">
                   <input type="checkbox" />
                   <span>Ghi nhớ đăng nhập</span>
                 </label>
                 <button
                   type="button"
-                  className="forgot-link-netflix"
+                  className="forgot-link-MOIVE"
                   onClick={() => {
                     setMode(modes.RESET);
                     setError('');
@@ -197,13 +197,13 @@ export const AuthPage = () => {
             )}
           </form>
 
-          <div className="auth-switch-netflix">
+          <div className="auth-switch-MOIVE">
             {mode === modes.LOGIN && (
               <>
-                <span className="switch-text">Bạn mới sử dụng Netflix?</span>
+                <span className="switch-text">Bạn mới sử dụng MOIVE?</span>
                 <button
                   type="button"
-                  className="switch-link-netflix"
+                  className="switch-link-MOIVE"
                   onClick={() => {
                     setMode(modes.REGISTER);
                     setError('');
@@ -219,7 +219,7 @@ export const AuthPage = () => {
                 <span className="switch-text">Đã có tài khoản?</span>
                 <button
                   type="button"
-                  className="switch-link-netflix"
+                  className="switch-link-MOIVE"
                   onClick={() => {
                     setMode(modes.LOGIN);
                     setError('');
@@ -233,7 +233,7 @@ export const AuthPage = () => {
             {mode === modes.RESET && (
               <button
                 type="button"
-                className="switch-link-netflix"
+                className="switch-link-MOIVE"
                 onClick={() => {
                   setMode(modes.LOGIN);
                   setError('');
@@ -245,7 +245,7 @@ export const AuthPage = () => {
             )}
           </div>
 
-          <div className="auth-info-netflix">
+          <div className="auth-info-MOIVE">
             <p>
               Trang này được bảo vệ bởi Google reCAPTCHA để đảm bảo bạn không phải là robot.{' '}
               <a href="#">Tìm hiểu thêm</a>.

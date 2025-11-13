@@ -1,5 +1,5 @@
-/* Netflix Auth Form */
-.auth-form-wrapper-netflix {
+/* MOIVE Auth Form */
+.auth-form-wrapper-MOIVE {
   background: rgba(0, 0, 0, 0.75);
   border-radius: 4px;
   padding: 60px 68px 40px;
@@ -18,28 +18,28 @@
   }
 }
 
-.auth-title-netflix {
+.auth-title-MOIVE {
   color: #fff;
   font-size: 32px;
   font-weight: 700;
   margin: 0 0 28px 0;
 }
 
-.auth-form-netflix {
+.auth-form-MOIVE {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.form-group-netflix {
+.form-group-MOIVE {
   position: relative;
 }
 
-.form-group-netflix.password-group {
+.form-group-MOIVE.password-group {
   position: relative;
 }
 
-.input-netflix {
+.input-MOIVE {
   width: 100%;
   padding: 16px 20px;
   background: #333;
@@ -50,21 +50,21 @@
   transition: all 0.2s ease;
 }
 
-.input-netflix:focus {
+.input-MOIVE:focus {
   outline: none;
   background: #454545;
 }
 
-.input-netflix::placeholder {
+.input-MOIVE::placeholder {
   color: #8c8c8c;
 }
 
-.input-netflix:disabled {
+.input-MOIVE:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.toggle-password-netflix {
+.toggle-password-MOIVE {
   position: absolute;
   right: 16px;
   top: 50%;
@@ -80,11 +80,11 @@
   text-transform: uppercase;
 }
 
-.toggle-password-netflix:hover {
+.toggle-password-MOIVE:hover {
   color: #fff;
 }
 
-.alert-netflix {
+.alert-MOIVE {
   padding: 12px 16px;
   border-radius: 4px;
   display: flex;
@@ -105,23 +105,23 @@
   }
 }
 
-.alert-netflix svg {
+.alert-MOIVE svg {
   flex-shrink: 0;
 }
 
-.error-netflix {
+.error-MOIVE {
   background: rgba(229, 9, 20, 0.15);
   border: 1px solid rgba(229, 9, 20, 0.3);
   color: #e87c03;
 }
 
-.success-netflix {
+.success-MOIVE {
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: #46d369;
 }
 
-.btn-submit-netflix {
+.btn-submit-MOIVE {
   width: 100%;
   padding: 16px;
   background: #e50914;
@@ -139,16 +139,16 @@
   gap: 10px;
 }
 
-.btn-submit-netflix:hover:not(:disabled) {
+.btn-submit-MOIVE:hover:not(:disabled) {
   background: #f40612;
 }
 
-.btn-submit-netflix:disabled {
+.btn-submit-MOIVE:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
-.loading-spinner-netflix {
+.loading-spinner-MOIVE {
   width: 20px;
   height: 20px;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -163,14 +163,14 @@
   }
 }
 
-.form-extras-netflix {
+.form-extras-MOIVE {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-top: 4px;
 }
 
-.remember-me-netflix {
+.remember-me-MOIVE {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -179,13 +179,13 @@
   cursor: pointer;
 }
 
-.remember-me-netflix input[type="checkbox"] {
+.remember-me-MOIVE input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
 }
 
-.forgot-link-netflix {
+.forgot-link-MOIVE {
   background: none;
   border: none;
   color: #b3b3b3;
@@ -194,12 +194,12 @@
   transition: all 0.2s ease;
 }
 
-.forgot-link-netflix:hover {
+.forgot-link-MOIVE:hover {
   color: #fff;
   text-decoration: underline;
 }
 
-.auth-switch-netflix {
+.auth-switch-MOIVE {
   margin-top: 16px;
   display: flex;
   align-items: center;
@@ -212,7 +212,7 @@
   font-size: 16px;
 }
 
-.switch-link-netflix {
+.switch-link-MOIVE {
   background: none;
   border: none;
   color: #fff;
@@ -222,53 +222,53 @@
   transition: all 0.2s ease;
 }
 
-.switch-link-netflix:hover {
+.switch-link-MOIVE:hover {
   text-decoration: underline;
 }
 
-.auth-info-netflix {
+.auth-info-MOIVE {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid #333;
 }
 
-.auth-info-netflix p {
+.auth-info-MOIVE p {
   color: #737373;
   font-size: 13px;
   line-height: 1.5;
   margin: 0;
 }
 
-.auth-info-netflix a {
+.auth-info-MOIVE a {
   color: #0071eb;
   text-decoration: none;
 }
 
-.auth-info-netflix a:hover {
+.auth-info-MOIVE a:hover {
   text-decoration: underline;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .auth-form-wrapper-netflix {
+  .auth-form-wrapper-MOIVE {
     padding: 40px 28px;
   }
 
-  .auth-title-netflix {
+  .auth-title-MOIVE {
     font-size: 28px;
   }
 
-  .input-netflix {
+  .input-MOIVE {
     padding: 14px 16px;
     font-size: 15px;
   }
 
-  .btn-submit-netflix {
+  .btn-submit-MOIVE {
     padding: 14px;
     font-size: 15px;
   }
 
-  .form-extras-netflix {
+  .form-extras-MOIVE {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
@@ -276,16 +276,16 @@
 }
 
 @media (max-width: 480px) {
-  .auth-form-wrapper-netflix {
+  .auth-form-wrapper-MOIVE {
     padding: 30px 20px;
   }
 
-  .auth-title-netflix {
+  .auth-title-MOIVE {
     font-size: 24px;
   }
 
   .switch-text,
-  .switch-link-netflix {
+  .switch-link-MOIVE {
     font-size: 14px;
   }
 }

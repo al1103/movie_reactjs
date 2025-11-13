@@ -1,4 +1,4 @@
-# 🎬 Movie ReactJS - Netflix-like Movie Portal
+# 🎬 Movie ReactJS - MOIVE-like Movie Portal
 
 A modern, full-featured movie discovery application built with React, featuring integration with a movie backend API. Browse movies by collections, search, filter by genre/country, and manage your favorites.
 
@@ -293,7 +293,7 @@ MIT License - see LICENSE file for details
 ## 🙏 Acknowledgments
 
 - Built with React and Vite
-- Netflix design inspiration
+- MOIVE design inspiration
 - Community feedback
 
 ## 👨‍💻 Author

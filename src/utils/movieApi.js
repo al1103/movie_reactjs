@@ -3,14 +3,14 @@
  * Base URL: http://localhost:3000 (có thể cấu hình qua env)
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 // Utility function to handle API calls
 const apiCall = async (endpoint, options = {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
       ...options,
@@ -22,7 +22,7 @@ const apiCall = async (endpoint, options = {}) => {
 
     return await response.json();
   } catch (error) {
-    console.error('API Call Error:', error);
+    console.error("API Call Error:", error);
     throw error;
   }
 };
@@ -32,12 +32,11 @@ const apiCall = async (endpoint, options = {}) => {
  */
 export const movieApi = {
   // Get latest movies
-  getLatestMovies: (page = 1, version = 'v1') =>
+  getLatestMovies: (page = 1, version = "v1") =>
     apiCall(`/api/movies/new?page=${page}&version=${version}`),
 
   // Get movie by slug
-  getMovieBySlug: (slug) =>
-    apiCall(`/api/movies/${slug}`),
+  getMovieBySlug: (slug) => apiCall(`/api/movies/${slug}`),
 
   // Get movie by TMDB
   getMovieByTMDB: (type, tmdbId) =>
@@ -97,8 +96,7 @@ export const collectionApi = {
  */
 export const genreApi = {
   // Get all genres
-  getAllGenres: () =>
-    apiCall('/api/genres'),
+  getAllGenres: () => apiCall("/api/genres"),
 
   // Get genre details with movies
   getGenreDetails: (slug, page = 1, limit = 10) =>
@@ -110,8 +108,7 @@ export const genreApi = {
  */
 export const countryApi = {
   // Get all countries
-  getAllCountries: () =>
-    apiCall('/api/countries'),
+  getAllCountries: () => apiCall("/api/countries"),
 
   // Get country details with movies
   getCountryDetails: (slug, page = 1, limit = 10) =>
@@ -131,7 +128,8 @@ export const yearApi = {
  * Utility function to convert API response to internal format
  */
 export const normalizeMovieFromAPI = (apiMovie) => ({
-  id: apiMovie.slug,
+  id: apiMovie._id || apiMovie.id || apiMovie.slug,
+  _id: apiMovie._id,
   slug: apiMovie.slug,
   title: apiMovie.name,
   origin_name: apiMovie.origin_name,
@@ -164,7 +162,6 @@ export const normalizeMovieFromAPI = (apiMovie) => ({
   createdAt: apiMovie.createdAt,
   updatedAt: apiMovie.updatedAt,
   ratings: [],
-  comments: [],
   favorites: 0,
 });
 
@@ -172,7 +169,8 @@ export const normalizeMovieFromAPI = (apiMovie) => ({
  * Utility function to normalize genre from API
  */
 export const normalizeGenreFromAPI = (apiGenre) => ({
-  id: apiGenre.slug,
+  id: apiGenre._id || apiGenre.id || apiGenre.slug,
+  _id: apiGenre._id,
   slug: apiGenre.slug,
   name: apiGenre.name,
   updatedAt: apiGenre.updatedAt,

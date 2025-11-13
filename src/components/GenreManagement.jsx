@@ -7,6 +7,7 @@ export const GenreManagement = ({ genres, adminActions }) => {
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const filteredGenres = useMemo(() => {
     if (!searchQuery.trim()) return genres;
@@ -14,13 +15,15 @@ export const GenreManagement = ({ genres, adminActions }) => {
     return genres.filter(genre => genre.name.toLowerCase().includes(query));
   }, [genres, searchQuery]);
 
-  const handleGenreSubmit = (event) => {
+  const handleGenreSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setMessage('');
+    setLoading(true);
 
     if (!genreName.trim()) {
       setError('Tên thể loại không được để trống');
+      setLoading(false);
       return;
     }
 
@@ -28,21 +31,49 @@ export const GenreManagement = ({ genres, adminActions }) => {
     const duplicate = genres.find(g => g.name.toLowerCase() === genreName.trim().toLowerCase());
     if (duplicate) {
       setError('Thể loại này đã tồn tại');
+      setLoading(false);
       return;
     }
 
-    adminActions.upsertGenre({ id: `g${Date.now()}`, name: genreName.trim() });
-    setGenreName('');
-    setMessage('✓ Đã thêm thể loại thành công');
-    setTimeout(() => setMessage(''), 3000);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_BASE_URL}/api/genres`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({ name: genreName.trim() })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create genre');
+      }
+
+      const data = await response.json();
+      console.log('✓ Genre created:', data);
+      
+      // Also update local state
+      adminActions.upsertGenre(data);
+      setGenreName('');
+      setMessage('✓ Đã thêm thể loại thành công');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.error('Error creating genre:', err);
+      setError('Lỗi khi thêm thể loại: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleGenreUpdate = (genreId) => {
+  const handleGenreUpdate = async (genreId) => {
     setError('');
     setMessage('');
+    setLoading(true);
 
     if (!editingName.trim()) {
       setError('Tên thể loại không được để trống');
+      setLoading(false);
       return;
     }
 
@@ -52,21 +83,71 @@ export const GenreManagement = ({ genres, adminActions }) => {
     );
     if (duplicate) {
       setError('Thể loại này đã tồn tại');
+      setLoading(false);
       return;
     }
 
-    adminActions.upsertGenre({ id: genreId, name: editingName.trim() });
-    setEditingId(null);
-    setEditingName('');
-    setMessage('✓ Đã cập nhật thể loại thành công');
-    setTimeout(() => setMessage(''), 3000);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_BASE_URL}/api/genres/${genreId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({ name: editingName.trim() })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update genre');
+      }
+
+      const data = await response.json();
+      console.log('✓ Genre updated:', data);
+      
+      // Also update local state
+      adminActions.upsertGenre({ id: genreId, name: editingName.trim() });
+      setEditingId(null);
+      setEditingName('');
+      setMessage('✓ Đã cập nhật thể loại thành công');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.error('Error updating genre:', err);
+      setError('Lỗi khi cập nhật thể loại: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleGenreDelete = (genreId) => {
+  const handleGenreDelete = async (genreId) => {
     if (!window.confirm('Bạn có chắc muốn xóa thể loại này?')) return;
-    adminActions.deleteGenre(genreId);
-    setMessage('✓ Đã xóa thể loại');
-    setTimeout(() => setMessage(''), 3000);
+    
+    setLoading(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_BASE_URL}/api/genres/${genreId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete genre');
+      }
+
+      console.log('✓ Genre deleted');
+      
+      // Also update local state
+      adminActions.deleteGenre(genreId);
+      setMessage('✓ Đã xóa thể loại');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.error('Error deleting genre:', err);
+      setError('Lỗi khi xóa thể loại: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const startEditing = (genre) => {
@@ -109,12 +190,13 @@ export const GenreManagement = ({ genres, adminActions }) => {
               placeholder="Ví dụ: Action, Drama, Comedy..."
               value={genreName}
               onChange={(event) => setGenreName(event.target.value)}
+              disabled={loading}
             />
-            <button className="btn-add-genre" type="submit">
+            <button className="btn-add-genre" type="submit" disabled={loading}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M12 5v14M5 12h14" strokeWidth="2" strokeLinecap="round"/>
               </svg>
-              Thêm thể loại
+              {loading ? 'Đang xử lý...' : 'Thêm thể loại'}
             </button>
           </div>
         </form>
@@ -160,11 +242,13 @@ export const GenreManagement = ({ genres, adminActions }) => {
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
                       autoFocus
+                      disabled={loading}
                     />
                     <div className="edit-actions">
                       <button
                         className="btn-save-edit"
                         onClick={() => handleGenreUpdate(genre.id)}
+                        disabled={loading}
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M20 6L9 17l-5-5" strokeWidth="2" strokeLinecap="round"/>
@@ -173,6 +257,7 @@ export const GenreManagement = ({ genres, adminActions }) => {
                       <button
                         className="btn-cancel-edit"
                         onClick={cancelEditing}
+                        disabled={loading}
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M18 6L6 18M6 6l12 12" strokeWidth="2" strokeLinecap="round"/>
@@ -196,6 +281,7 @@ export const GenreManagement = ({ genres, adminActions }) => {
                         className="btn-edit-genre"
                         onClick={() => startEditing(genre)}
                         title="Chỉnh sửa"
+                        disabled={loading}
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeWidth="2"/>
@@ -205,6 +291,7 @@ export const GenreManagement = ({ genres, adminActions }) => {
                         className="btn-delete-genre"
                         onClick={() => handleGenreDelete(genre.id)}
                         title="Xóa"
+                        disabled={loading}
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                           <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" strokeWidth="2"/>

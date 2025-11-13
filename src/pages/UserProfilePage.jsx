@@ -1,10 +1,58 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext.jsx';
+import { UserHeader } from '../components/UserHeader.jsx';
 import './pages-modern.css';
 
 export const UserProfilePage = () => {
   const navigate = useNavigate();
   const { currentUser, logout } = useAppData();
+  const [favoritesCount, setFavoritesCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch favorites from API
+  useEffect(() => {
+    const fetchFavoritesCount = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('No token found, skipping favorites fetch');
+          setLoading(false);
+          return;
+        }
+
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${API_BASE_URL}/api/auth/favorites`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        console.log('Favorites API response status:', response.status);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Favorites fetched:', data);
+          
+          // Handle both array and { favorites: [...] } response formats
+          const favorites = Array.isArray(data) ? data : (data.favorites || []);
+          setFavoritesCount(favorites.length);
+        } else {
+          console.warn('❌ Failed to fetch favorites:', response.status);
+        }
+      } catch (err) {
+        console.error('❌ Error fetching favorites:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (currentUser) {
+      fetchFavoritesCount();
+    } else {
+      setLoading(false);
+    }
+  }, [currentUser]);
 
   const handleLogout = () => {
     logout();
@@ -16,46 +64,8 @@ export const UserProfilePage = () => {
   }
 
   return (
-    <div className="netflix-home">
-      <header className="netflix-header scrolled">
-        <div className="header-left">
-          <div className="netflix-logo" onClick={() => navigate('/')}>NETFLIX</div>
-          <nav className="header-nav">
-            <button onClick={() => navigate('/')} className="nav-link">Home</button>
-            <button onClick={() => navigate('/my-favorites')} className="nav-link">My List</button>
-            <button onClick={() => navigate('/my-history')} className="nav-link">History</button>
-          </nav>
-        </div>
-        <div className="header-right">
-          <div className="user-menu">
-            <div className="user-profile">
-              <img src="https://i.pravatar.cc/40" alt="User" />
-            </div>
-            <div className="user-dropdown">
-              <button onClick={() => navigate('/profile')} className="dropdown-item">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" strokeWidth="2"/>
-                </svg>
-                Profile
-              </button>
-              {currentUser.role === 'admin' && (
-                <button onClick={() => navigate('/admin/movies')} className="dropdown-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2"/>
-                  </svg>
-                  Admin Panel
-                </button>
-              )}
-              <button onClick={handleLogout} className="dropdown-item">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" strokeWidth="2"/>
-                </svg>
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="MOIVE-home">
+      <UserHeader scrolled={true} />
 
       <div className="admin-content">
         <div className="admin-hero">
@@ -100,20 +110,8 @@ export const UserProfilePage = () => {
                   </svg>
                 </div>
                 <div className="stat-content-profile">
-                  <span className="stat-value-profile">{currentUser.favorites?.length || 0}</span>
+                  <span className="stat-value-profile">{loading ? '...' : favoritesCount}</span>
                   <span className="stat-label-profile">Phim yêu thích</span>
-                </div>
-              </div>
-
-              <div className="profile-stat-card history-stat">
-                <div className="stat-icon-profile">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <div className="stat-content-profile">
-                  <span className="stat-value-profile">{currentUser.history?.length || 0}</span>
-                  <span className="stat-label-profile">Phim đã xem</span>
                 </div>
               </div>
             </div>
@@ -180,12 +178,6 @@ export const UserProfilePage = () => {
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" strokeWidth="2"/>
                 </svg>
                 Danh sách yêu thích
-              </button>
-              <button className="action-btn history-btn" onClick={() => navigate('/my-history')}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeWidth="2"/>
-                </svg>
-                Lịch sử xem
               </button>
             </div>
           </div>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppData } from '../context/AppDataContext.jsx';
 import { movieApi } from '../utils/movieApi.js';
+import { SearchBar } from '../components/SearchBar.jsx';
+import { Header } from '../components/Header.jsx';
 import './pages-modern.css';
 
 const formatDate = (timestamp) => new Date(timestamp).toLocaleString('vi-VN');
@@ -42,6 +44,11 @@ export const MovieDetailPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isFavorite, setIsFavorite] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Fetch movie detail from API
   useEffect(() => {
@@ -55,8 +62,44 @@ export const MovieDetailPage = () => {
         // API returns { movie: {...} } so we extract movie object
         const movieData = response.movie || response;
         setMovie(movieData);
-        setIsFavorite(currentUser?.favorites?.includes(movieData.slug) || false);
         console.log('Movie loaded:', movieData); // Debug log
+
+        // Check favorite status from API
+        const token = localStorage.getItem('token');
+        console.log('Token found:', !!token);
+        
+        if (token) {
+          const movieSlug = movieData.slug || movieData.id;
+          console.log('Checking favorite for slug:', movieSlug);
+          
+          try {
+            const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const favoriteUrl = `${API_BASE_URL}/api/auth/favorites/${movieSlug}`;
+            console.log('Favorite API URL:', favoriteUrl);
+            
+            const favoriteResponse = await fetch(favoriteUrl, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+
+            console.log('Favorite response status:', favoriteResponse.status, favoriteResponse.ok);
+
+            if (favoriteResponse.ok) {
+              const favoriteData = await favoriteResponse.json();
+              console.log('✅ Favorite status API response:', favoriteData);
+              setIsFavorite(favoriteData.isFavorited || false);
+            } else {
+              console.warn('❌ Favorite API returned non-ok status:', favoriteResponse.status);
+              const errorText = await favoriteResponse.text();
+              console.warn('Error response:', errorText);
+            }
+          } catch (favoriteErr) {
+            console.error('❌ Error checking favorite status:', favoriteErr);
+          }
+        } else {
+          console.log('No token found, skipping favorite check');
+        }
       } catch (err) {
         console.error('Error fetching movie detail:', err);
         setError('Không thể tải thông tin phim. Vui lòng thử lại.');
@@ -66,14 +109,110 @@ export const MovieDetailPage = () => {
     };
 
     fetchMovieDetail();
-  }, [id, currentUser?.favorites]);
+  }, [id]);
 
-  const handleFavorite = () => {
+  // Search functionality - use API
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const fetchSearchResults = async () => {
+        setSearchLoading(true);
+        try {
+          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const keyword = encodeURIComponent(searchQuery);
+          const response = await fetch(`${API_BASE_URL}/api/search?keyword=${keyword}&page=1&limit=20`);
+          
+          console.log('Search API response status:', response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Search results from API:', data);
+            
+            // Handle different response formats
+            const results = Array.isArray(data) ? data : (data.items || data.results || []);
+            
+            // Normalize results to match UI expectations
+            const normalizedResults = results.map(m => ({
+              id: m._id || m.id,
+              title: m.name || m.title,
+              poster: m.poster_url || m.thumb_url || m.poster,
+              rating: m.rating || 0,
+              year: m.year,
+              duration: m.time || m.duration,
+              description: m.content || m.description,
+              slug: m.slug,
+            })).filter(Boolean);
+            
+            setSearchResults(normalizedResults);
+          } else {
+            console.warn('❌ Search API failed:', response.status);
+            setSearchResults([]);
+          }
+        } catch (err) {
+          console.error('❌ Error searching:', err);
+          setSearchResults([]);
+        } finally {
+          setSearchLoading(false);
+        }
+      };
+      
+      fetchSearchResults();
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  const handleSearchResultClick = (movie) => {
+    navigate(`/movie/${movie.slug || movie.id}`);
+    setShowSearch(false);
+    setSearchQuery('');
+  };
+
+  const handleFavorite = async () => {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const token = localStorage.getItem('token');
+    
+    console.log('🔄 handleFavorite called:', { isFavorite, token: !!token, movie: movie?.slug });
+    
+    if (!token) {
+      console.error('❌ No token found, user must be logged in');
+      return;
+    }
+
+    if (!movie) {
+      console.error('❌ No movie data available');
+      return;
+    }
+
     try {
-      toggleFavorite(movie?.slug);
-      setIsFavorite(!isFavorite);
+      const movieSlug = movie.slug || movie.id;
+      const method = isFavorite ? 'DELETE' : 'POST';
+      const url = `${API_BASE_URL}/api/auth/favorites/${movieSlug}`;
+      
+      console.log(`📤 Making ${method} request to:`, url);
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      console.log('📥 Response status:', response.status, response.ok);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ API Response:', data);
+      
+      if (data.success || response.ok) {
+        setIsFavorite(!isFavorite);
+        console.log('✅ Favorite status updated:', !isFavorite);
+      }
     } catch (err) {
-      console.error('Error toggling favorite:', err);
+      console.error('❌ Error toggling favorite:', err.message);
     }
   };
 
@@ -139,71 +278,14 @@ export const MovieDetailPage = () => {
   }
 
   return (
-    <div className="netflix-home">
+    <div className="MOIVE-home">
       {/* Header */}
-      <header className="netflix-header scrolled">
-        <div className="header-left">
-          <div className="netflix-logo" onClick={() => navigate('/')}>NETFLIX</div>
-          <nav className="header-nav">
-            <button onClick={() => navigate('/')} className="nav-link">Home</button>
-            <button onClick={() => navigate('/')} className="nav-link">TV Shows</button>
-            <button onClick={() => navigate('/')} className="nav-link">Movies</button>
-            <button onClick={() => navigate(currentUser ? '/my-favorites' : '/auth')} className="nav-link">My List</button>
-          </nav>
-        </div>
-        <div className="header-right">
-          <button className="icon-btn search-btn" title="Search">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-          {currentUser && (
-            <button className="icon-btn notification-btn" title="Notifications">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M15 17H20L18.595 15.595C18.4063 15.4063 18.3 15.1513 18.3 14.885V11C18.3 8.61305 16.7305 6.57 14.55 5.795C14.2672 4.77154 13.3873 4 12.3 4C11.2127 4 10.3328 4.77154 10.05 5.795C7.86954 6.57 6.3 8.61305 6.3 11V14.885C6.3 15.1513 6.19373 15.4063 6.005 15.595L4.6 17H9.3M15 17V18C15 19.6569 13.6569 21 12 21C10.3431 21 9 19.6569 9 18V17M15 17H9.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
-          <div className="user-menu">
-            <div className="user-profile">
-              <img src="https://i.pravatar.cc/40" alt="User" />
-            </div>
-            <div className="user-dropdown">
-              {currentUser ? (
-                <>
-                  <button onClick={() => navigate('/profile')} className="dropdown-item">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" strokeWidth="2"/>
-                    </svg>
-                    Profile
-                  </button>
-                  {currentUser.role === 'admin' && (
-                    <button onClick={() => navigate('/admin/movies')} className="dropdown-item">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeWidth="2"/>
-                      </svg>
-                      Admin Panel
-                    </button>
-                  )}
-                  <button onClick={handleLogout} className="dropdown-item">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" strokeWidth="2"/>
-                    </svg>
-                    Logout
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => navigate('/auth')} className="dropdown-item">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3" strokeWidth="2"/>
-                  </svg>
-                  Sign In
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header 
+        scrolled={true}
+        showSearch={true}
+        onSearchClick={() => setShowSearch(true)}
+        isHomePage={true}
+      />
 
       {/* Movie Detail Content */}
       <div className="movie-detail-page">
@@ -249,7 +331,7 @@ export const MovieDetailPage = () => {
             </div>
 
             <div className="movie-detail-actions">
-              <button className="btn-play">
+              <button className="btn-play" onClick={() => setShowPlayer(true)}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M8 5v14l11-7z"/>
                 </svg>
@@ -303,9 +385,9 @@ export const MovieDetailPage = () => {
               <div className="detail-item">
                 <span className="detail-label">Quốc gia</span>
                 <span className="detail-value">
-                  {movie.country && movie.country.length > 0
-                    ? movie.country.map(c => c.name).join(', ')
-                    : 'N/A'
+                  {Array.isArray(movie.country)
+                    ? movie.country.map(c => c.name || c).join(', ')
+                    : movie.country || 'N/A'
                   }
                 </span>
               </div>
@@ -408,6 +490,180 @@ export const MovieDetailPage = () => {
           )}
         </div>
       </div>
+
+      {/* Search Modal */}
+      {showSearch && (
+        <div 
+          className="search-modal-overlay" 
+          onClick={() => setShowSearch(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '80px',
+          }}
+        >
+          <div 
+            className="search-modal" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#181818',
+              borderRadius: '12px',
+              width: '90%',
+              maxWidth: '800px',
+              padding: '28px',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+              border: '1px solid #2a2a2a',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid #2a2a2a' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: '#e5e5e5', fontWeight: '700' }}>🔍 Tìm kiếm phim</h2>
+              <button 
+                onClick={() => setShowSearch(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#e5e5e5',
+                  transition: 'transform 0.2s ease',
+                  padding: '4px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => e.target.style.transform = 'rotate(90deg)'}
+                onMouseLeave={(e) => e.target.style.transform = 'rotate(0)'}
+              >
+                ✕
+              </button>
+            </div>
+
+            <SearchBar
+              query={searchQuery}
+              onChange={setSearchQuery}
+              results={searchResults}
+              isLoading={searchLoading}
+              showResults={true}
+              placeholder="Tìm kiếm phim, đạo diễn, diễn viên..."
+              title=""
+              description=""
+              variant="dark"
+              onResultClick={handleSearchResultClick}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Video Player Modal */}
+      {showPlayer && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={() => setShowPlayer(false)}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '1200px',
+              aspectRatio: '16 / 9',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowPlayer(false)}
+              style={{
+                position: 'absolute',
+                top: '-50px',
+                right: 0,
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#fff',
+                fontSize: '32px',
+                cursor: 'pointer',
+                zIndex: 1001,
+                padding: '0',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="Close"
+            >
+              ✕
+            </button>
+
+            {/* Video Player - YouTube or Cloudinary */}
+            {movie.trailer && (movie.trailer.includes('youtube.com') || movie.trailer.includes('youtu.be')) ? (
+              // YouTube Player
+              <iframe
+                src={
+                  (() => {
+                    let videoId = '';
+                    if (movie.trailer.includes('youtu.be')) {
+                      // Format: https://youtu.be/VIDEO_ID
+                      videoId = movie.trailer.split('/').pop().split('?')[0];
+                    } else if (movie.trailer.includes('youtube.com')) {
+                      // Format: https://www.youtube.com/watch?v=VIDEO_ID&...
+                      const url = new URL(movie.trailer);
+                      videoId = url.searchParams.get('v');
+                    }
+                    return `https://www.youtube.com/embed/${videoId}`;
+                  })()
+                }
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  borderRadius: '8px',
+                }}
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                allowFullScreen
+                frameBorder="0"
+                title={movie.name}
+              />
+            ) : (
+              // Cloudinary Player
+              <iframe
+                src={`https://player.cloudinary.com/embed/?cloud_name=dcmzsjorh&public_id=${movie.trailer || movie.trailerUrl || 'movies%2Fvideos%2Fdklmszvyfq0jdaypm9kh'}&profile=cld-default`}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  borderRadius: '8px',
+                }}
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                allowFullScreen
+                frameBorder="0"
+                title={movie.name}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
